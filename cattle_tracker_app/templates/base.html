@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Cattle Tracker{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  {% block extra_head %}{% endblock %}
+  {% block extra_styles %}{% endblock %}
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Sidebar Toggle -->
+  <button class="fixed top-4 left-4 z-50 p-2 bg-gray-800 text-white rounded-md md:hidden" onclick="toggleSidebar()">☰ Menu</button>
+  <div class="min-h-screen flex flex-col md:flex-row">
+    <aside id="sidebar" class="w-full md:w-64 bg-white dark:bg-gray-800 shadow-md md:block hidden">
+      {% include 'partials/sidebar.html' %}
+    </aside>
+    <main class="flex-1 p-4 md:p-6">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <!-- Core Scripts -->
+  <script src="https://unpkg.com/htmx.org@1.9.6" defer></script>
+  <script src="{% static 'js/profile_card.js' %}" defer></script>
+  
+
+  {% block leaflet_map_js %}{% endblock %}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js" defer></script>
+  {% block extra_scripts %}{% endblock %}
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('hidden');
+    }
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+    }
+  </script>
+
+  <script>
+    // CSRF helper
+    function getCookie(name) {
+      let value = null;
+      document.cookie.split(';').forEach(cookie => {
+        const [k,v] = cookie.trim().split('=');
+        if (k === name) value = decodeURIComponent(v);
+      });
+      return value;
+    }
+
+    // Save field via AJAX and reload
+    function saveField() {
+      const form = document.getElementById('inline-form');
+      let errors = document.getElementById('form-errors');
+      if (!errors) {
+        errors = document.createElement('div');
+        errors.id = 'form-errors';
+        errors.className = 'text-red-500 mb-2';
+        form.prepend(errors);
+      }
+      errors.textContent = '';
+      fetch(window.location.href, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: new FormData(form)
+      })
+      .then(r => r.json())
+      .then(json => {
+        if (json.status === 'success') {
+          window.location.reload();
+        } else {
+          errors.textContent = Object.values(json.errors || {}).flat().join(' ');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        errors.textContent = 'Save failed.';
+      });
+    }
+
+    // Delegated toggle and save
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('#edit-toggle');
+      if (btn) {
+        const form = document.getElementById('inline-form');
+        const view = document.getElementById('static-display');
+        if (form && view) {
+          form.classList.toggle('hidden');
+          view.classList.toggle('hidden');
+        }
+      }
+    });
+    document.addEventListener('change', function(e) {
+      if (e.target.closest('#inline-form')) {
+        saveField();
+      }
+    });
+  </script>
+  <script src="{% static 'js/validation.js' %}"></script>
+</body>
+</html>

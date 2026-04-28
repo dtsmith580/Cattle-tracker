@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Leased Bull {{ leased_bull.ear_tag }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Leased Bull Details</h1>
+<div class="bg-white shadow rounded-lg p-4 space-y-4 mx-auto w-full max-w-screen-sm" id="leased-bull-card">
+  {% if leased_bull.image %}
+  <div>
+    <img src="{{ leased_bull.image.url }}" alt="Photo of {{ leased_bull.ear_tag }}" class="rounded-lg max-w-xs mb-4 hover:cursor-zoom-in" onclick="openImageModal('{{ leased_bull.image.url }}')">
+  </div>
+{% else %}
+  <div class="mb-4 text-sm text-gray-500 italic">No image uploaded.</div>
+{% endif %}
+ 
+  <button type="button" class="edit-btn float-right" onclick="toggleAllEdit()">✏️ Edit</button>
+  <form id="leased-bull-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <p><strong>Ear Tag:</strong>
+      <span class="field-display">{{ leased_bull.ear_tag }}</span>
+      <input class="field-input hidden" name="ear_tag" type="text" value="{{ leased_bull.ear_tag }}" />
+    </p>
+
+    <p><strong>Breed:</strong>
+      <span class="field-display">{{ leased_bull.breed }}</span>
+      <input class="field-input hidden" name="breed" type="text" value="{{ leased_bull.breed }}" />
+    </p>
+
+    <p><strong>Date of Birth:</strong>
+      <span class="field-display">{{ leased_bull.dob|date:"Y-m-d" }}</span>
+      <input class="field-input hidden" name="dob" type="date" value="{{ leased_bull.dob|date:'Y-m-d' }}" />
+    </p>
+
+    <p><strong>Owner Name:</strong>
+      <span class="field-display">{{ leased_bull.owner_name }}</span>
+      <input class="field-input hidden" name="owner_name" type="text" value="{{ leased_bull.owner_name }}" />
+    </p>
+
+    <p><strong>Lease Start:</strong>
+      <span class="field-display">{{ leased_bull.lease_start }}</span>
+      <input class="field-input hidden" name="lease_start" type="date" value="{{ leased_bull.lease_start }}" />
+    </p>
+
+    <p><strong>Lease End:</strong>
+      <span class="field-display">{{ leased_bull.lease_end|default:"Ongoing" }}</span>
+      <input class="field-input hidden" name="lease_end" type="date" value="{{ leased_bull.lease_end|default_if_none:"" }}" />
+    </p>
+    <div id="image-edit-section" class="hidden">
+  <p><strong>Image:</strong></p>
+  <div class="space-y-2">
+    <input class="field-input" name="image" type="file" accept="image/*" onchange="autoSaveImage(this)" />
+    {% if leased_bull.image %}
+      <button type="button" class="delete-btn text-red-600 text-sm mt-2" onclick="deleteImage()">🗑️ Delete Image</button>
+    {% endif %}
+  </div>
+</div>
+</form>
+</div>
+
+<!-- Image Modal -->
+<div id="image-modal" class="fixed inset-0 z-50 bg-black bg-opacity-80 hidden items-center justify-center">
+  <div class="relative max-w-3xl w-full">
+    <img id="modal-image" src="" alt="Enlarged" class="mx-auto max-h-[90vh] rounded shadow-lg">
+    <button onclick="closeImageModal()" class="absolute top-2 right-2 text-white text-2xl">&times;</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg">
+  Changes saved successfully.
+</div>
+
+<style>
+  .field-input.hidden {
+    display: none;
+  }
+  .edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+  .toast {
+    z-index: 50;
+    transition: opacity 0.3s ease-in-out;
+  }
+</style>
+
+<script>
+  function toggleAllEdit() {
+  const form = document.getElementById("leased-bull-form");
+  const displays = form.querySelectorAll(".field-display");
+  const inputs = form.querySelectorAll(".field-input");
+  const imageEditSection = document.getElementById("image-edit-section");
+
+  displays.forEach(d => d.classList.add("hidden"));
+  inputs.forEach(i => {
+    i.classList.remove("hidden");
+    i.addEventListener('blur', autoSaveField);
+  });
+
+  if (imageEditSection) {
+    imageEditSection.classList.remove("hidden");
+  }
+}
+
+
+  function autoSaveField(event) {
+    const input = event.target;
+    const name = input.name;
+    const value = input.value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch("{% url 'update_field' leased_bull.id %}", {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken
+      },
+      body: new URLSearchParams({ field: name, value: value })
+    }).then(res => {
+      if (res.ok) {
+        const display = input.previousElementSibling;
+        display.textContent = value;
+        display.classList.remove("hidden");
+        input.classList.add("hidden");
+
+        showToast();
+
+        // Reload card after 3 seconds
+        setTimeout(() => {
+          location.reload();
+        }, 3000);
+      }
+    });
+  }
+
+  function showToast() {
+    const toast = document.getElementById("toast");
+    toast.classList.remove("hidden");
+    toast.style.opacity = "1";
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => toast.classList.add("hidden"), 300);
+    }, 2000);
+  }
+  function autoSaveImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('field', 'image');
+    formData.append('image', file);
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch("{% url 'update_field' leased_bull.id %}", {
+      method: "POST",
+      body: formData
+    }).then(res => {
+      if (res.ok) {
+        showToast();
+        setTimeout(() => {
+          location.reload();
+        }, 3000);
+      }
+    });
+  }
+  function deleteImage() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch("{% url 'update_field' leased_bull.id %}", {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken
+      },
+      body: new URLSearchParams({ delete_image: '1' })
+    }).then(res => {
+      if (res.ok) {
+        showToast();
+        setTimeout(() => {
+          location.reload();
+        }, 3000);
+      }
+    });
+  }
+
+  function openImageModal(src) {
+    const modal = document.getElementById("image-modal");
+    const modalImg = document.getElementById("modal-image");
+    modalImg.src = src;
+    modal.classList.remove("hidden");
+
+    modal.addEventListener("click", function(e) {
+      if (e.target === modal) closeImageModal();
+    });
+  }
+
+  function closeImageModal() {
+    const modal = document.getElementById("image-modal");
+    modal.classList.add("hidden");
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Herd Sire: {{ herd_sire.name }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Herd Sire Details</h1>
+
+<div class="bg-white shadow rounded-lg p-6 space-y-4 mx-auto w-full max-w-screen-sm" id="herd-sire-card">
+  {% if herd_sire.image %}
+    <div>
+      <img src="{{ herd_sire.image.url }}"
+     alt="Photo of {{ herd_sire.name }}"
+     class="rounded-lg h-48 w-auto mb-4 object-contain border border-gray-200 shadow-sm hover:cursor-zoom-in"
+     onclick="openImageModal('{{ herd_sire.image.url }}')" />
+    </div>
+  {% else %}
+    <div class="mb-4 text-sm text-gray-500 italic">No image uploaded.</div>
+  {% endif %}
+
+  <button type="button" class="edit-btn float-right" onclick="toggleAllEdit()">✏️ Edit</button>
+
+  <form id="herd-sire-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <p><strong>Name:</strong>
+      <span class="field-display">{{ herd_sire.name }}</span>
+      <input class="field-input hidden" name="name" type="text" value="{{ herd_sire.name }}" />
+    </p>
+
+    <p><strong>Semen Type:</strong>
+      <span class="field-display">{{ herd_sire.get_semen_type_display }}</span>
+      <select name="semen_type" class="field-input hidden">
+        {% for val, label in herd_sire.SEMEN_TYPE_CHOICES %}
+          <option value="{{ val }}" {% if val == herd_sire.semen_type %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </p>
+
+    <p><strong>Cleanup Method:</strong>
+      <span class="field-display">{{ herd_sire.get_cleanup_method_display }}</span>
+      <select name="cleanup_method" class="field-input hidden">
+        {% for val, label in herd_sire.CLEANUP_METHOD_CHOICES %}
+          <option value="{{ val }}" {% if val == herd_sire.cleanup_method %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </p>
+
+    <p><strong>Profile Link:</strong>
+      <span class="field-display">{{ herd_sire.profile_link|default:"—" }}</span>
+      <input class="field-input hidden" name="profile_link" type="url" value="{{ herd_sire.profile_link }}" />
+    </p>
+
+    <p><strong>Notes:</strong>
+      <span class="field-display whitespace-pre-line text-gray-700">{{ herd_sire.notes|default:"—" }}</span>
+      <textarea class="field-input hidden w-full border rounded p-2" name="notes">{{ herd_sire.notes }}</textarea>
+    </p>
+
+    <div id="image-edit-section" class="field-input hidden">
+      <p><strong>Image:</strong></p>
+      <input name="image" type="file" accept="image/*" onchange="validateImageSize(this, 2, autoSaveImage)" />
+      {% if herd_sire.image %}
+        <button type="button" class="delete-btn text-red-600 text-sm mt-2" onclick="deleteImage()">🗑️ Delete Image</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Image Modal -->
+<div id="image-modal" class="fixed inset-0 z-50 bg-black bg-opacity-80 hidden items-center justify-center">
+  <div class="relative max-w-3xl w-full">
+    <img id="modal-image" src="" alt="Enlarged" class="mx-auto max-h-[90vh] rounded shadow-lg">
+    <button onclick="closeImageModal()" class="absolute top-2 right-2 text-white text-2xl">&times;</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg">
+  Changes saved successfully.
+</div>
+
+<style>
+  .field-input.hidden { display: none; }
+  .edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+  .toast {
+    z-index: 50;
+    transition: opacity 0.3s ease-in-out;
+  }
+</style>
+
+<script>
+function toggleAllEdit() {
+  const form = document.getElementById("herd-sire-form");
+  const displays = form.querySelectorAll(".field-display");
+  const inputs = form.querySelectorAll(".field-input");
+
+  displays.forEach(d => d.classList.add("hidden"));
+  inputs.forEach(i => {
+    i.classList.remove("hidden");
+    i.addEventListener('blur', autoSaveField);
+    i.addEventListener('change', autoSaveField);
+  });
+}
+
+function autoSaveField(event) {
+  const form = document.getElementById("herd-sire-form");
+  const formData = new FormData(form);
+  const csrfToken = formData.get("csrfmiddlewaretoken");
+
+  fetch("{% url 'herd_sire_update' herd_sire.id %}", {
+    method: "POST",
+    body: formData,
+    headers: {
+      "X-CSRFToken": csrfToken
+    }
+  }).then(res => {
+    if (res.ok) {
+      showToast();
+
+      const input = event.target;
+      const display = input.closest('p')?.querySelector('.field-display');
+      if (display) {
+        display.textContent = input.value || "—";
+        display.classList.remove("hidden");
+        input.classList.add("hidden");
+      }
+
+      setTimeout(() => location.reload(), 3000);
+    }
+  });
+}
+
+function autoSaveImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+  fetch("{% url 'herd_sire_update' herd_sire.id %}", {
+    method: "POST",
+    body: formData
+  }).then(res => {
+    if (res.ok) {
+      showToast();
+      setTimeout(() => location.reload(), 3000);
+    }
+  });
+}
+
+function deleteImage() {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  fetch("{% url 'herd_sire_update' herd_sire.id %}", {
+    method: "POST",
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken
+    },
+    body: new URLSearchParams({ delete_image: '1' })
+  }).then(res => {
+    if (res.ok) {
+      showToast();
+      setTimeout(() => location.reload(), 3000);
+    }
+  });
+}
+
+function showToast() {
+  const toast = document.getElementById("toast");
+  toast.classList.remove("hidden");
+  toast.style.opacity = "1";
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.classList.add("hidden"), 300);
+  }, 2000);
+}
+
+function openImageModal(src) {
+  const modal = document.getElementById("image-modal");
+  const modalImg = document.getElementById("modal-image");
+  modalImg.src = src;
+  modal.classList.remove("hidden");
+
+  modal.addEventListener("click", function(e) {
+    if (e.target === modal) closeImageModal();
+  });
+}
+
+function closeImageModal() {
+  const modal = document.getElementById("image-modal");
+  modal.classList.add("hidden");
+}
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load group_filters %}
+{% block title %}Cattle List{% endblock %}
+
+{% block extra_head %}
+<!-- DataTables Core CSS (keep core table styling) -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+
+<!-- Leaflet CSS (optional: used if you re-enable the map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+<style>
+  /* Map (optional) */
+  #map { height: 50vh; }
+  .popup h4 { margin: 0 0 .25rem 0; font-size: 16px; }
+
+  /* Emoji-only DataTables buttons (strip any button chrome) */
+  #datatable-buttons .dt-button,
+  div.dt-buttons .dt-button,
+  .dt-button,
+  #datatable-buttons .dt-emoji {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0.5rem 0 0 !important;
+    color: inherit !important;
+    line-height: 1 !important;
+    font-size: 1.5rem; /* match the icon row size */
+    cursor: pointer;
+  }
+  #datatable-buttons .dt-button:hover,
+  #datatable-buttons .dt-button:focus,
+  #datatable-buttons .dt-emoji:hover,
+  #datatable-buttons .dt-emoji:focus {
+    transform: scale(1.15);
+    outline: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Cattle</h1>
+
+<!-- Map Section (currently disabled)
+<div class="mb-6">
+  <div id="map" class="w-full rounded border"></div>
+  <div id="map-debug" class="text-xs text-gray-600 mt-1">Loading map…</div>
+</div>
+-->
+
+<div class="flex items-center justify-start gap-4 mb-3">
+  <!-- Emoji-only Add Animal -->
+  <a href="{% url 'add_cattle' %}"
+     class="text-2xl hover:scale-110 transition-transform"
+     title="Add Animal">➕ Add Animal</a>
+
+  <!-- Emoji-only Export icons (DataTables will inject here) -->
+  <div id="datatable-buttons" class="flex flex-wrap items-center gap-3 text-2xl"></div>
+</div>
+
+
+
+<!-- Filters -->
+<form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+  <!--<input type="text" name="q" value="{{ q }}" placeholder="Search ear tag / reg # / owner"
+         class="border rounded px-3 py-2 md:col-span-2"> -->
+
+  <select name="owner" class="border rounded px-3 py-2">
+    <option value="">Owner (all)</option>
+    {% for o in owner_options %}
+      <option value="{{ o.id }}" {% if selected_owner == o.id|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="animal_type" class="border rounded px-3 py-2">
+    <option value="">Animal Type (all)</option>
+    {% for at in animal_type_options %}
+      <option value="{{ at }}" {% if selected_animal_type == at %}selected{% endif %}>{{ at }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status" class="border rounded px-3 py-2">
+    <option value="">Status (Active)</option>
+    {% for st in status_options %}
+      <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st|capfirst }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="pasture" class="border rounded px-3 py-2">
+    <option value="">Pasture (all)</option>
+    {% for p in pasture_options %}
+      <option value="{{ p.id }}" {% if selected_pasture == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="rounded-lg px-4 py-2 bg-green-600 text-white">Apply</button>
+</form>
+
+<!-- DataTables table -->
+<div class="bg-white shadow rounded-lg overflow-hidden">
+  <table id="cattleTable" class="min-w-full divide-y divide-gray-200" style="width:100%">
+    <thead class="bg-gray-100 text-left text-sm font-medium text-gray-700">
+      <tr>
+        <th class="px-4 py-2"></th>
+        <th class="px-4 py-2">Ear Tag</th>
+        <th class="px-4 py-2">
+          <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if selected_owner %}owner={{ selected_owner }}&{% endif %}{% if selected_animal_type %}animal_type={{ selected_animal_type }}&{% endif %}{% if selected_status %}status={{ selected_status }}&{% endif %}{% if selected_pasture %}pasture={{ selected_pasture }}&{% endif %}order={% if current == 'owner__name' %}-owner__name{% else %}owner__name{% endif %}">Owner</a>
+        </th>
+        <th class="px-4 py-2">
+          <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if selected_owner %}owner={{ selected_owner }}&{% endif %}{% if selected_animal_type %}animal_type={{ selected_animal_type }}&{% endif %}{% if selected_status %}status={{ selected_status }}&{% endif %}{% if selected_pasture %}pasture={{ selected_pasture }}&{% endif %}order={% if current == 'animal_type' %}-animal_type{% else %}animal_type{% endif %}">Animal Type</a>
+        </th>
+        <th class="px-4 py-2">Sex</th>
+        <th class="px-4 py-2">DOB</th>
+        <th class="px-4 py-2">
+          <a href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if selected_owner %}owner={{ selected_owner }}&{% endif %}{% if selected_animal_type %}animal_type={{ selected_animal_type }}&{% endif %}{% if selected_status %}status={{ selected_status }}&{% endif %}{% if selected_pasture %}pasture={{ selected_pasture }}&{% endif %}order={% if current == 'status' %}-status{% else %}status{% endif %}">Status</a>
+        </th>
+        <th class="px-4 py-2">Latest Weight</th>
+        <th class="px-4 py-2">Pasture</th>
+        <th class="px-4 py-2 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="bg-white divide-y divide-gray-200">
+      {% for cow in page_obj.object_list %}
+      <tr class="border-t">
+        <td class="px-4 py-2">
+          {% if cow.image %}
+            <img src="{{ cow.image.url }}" alt="{{ cow.ear_tag }}" class="h-12 w-12 object-cover rounded border" />
+          {% else %}
+            <span class="text-sm text-gray-400 italic">No image</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-2">
+          <a href="{% url 'view_cattle' cow.id %}" class="text-blue-600 hover:underline">{{ cow.ear_tag }}</a>
+        </td>
+        <td class="px-4 py-2">{{ cow.owner.name }}</td>
+        <td class="px-4 py-2">{{ cow.animal_type }}</td>
+        <td class="px-4 py-2">{{ cow.sex }}</td>
+        <td class="px-4 py-2">{{ cow.dob }}</td>
+        <td class="px-4 py-2">{{ cow.status }}</td>
+        <td class="px-4 py-2">
+          {% if cow.latest_weight %}{{ cow.latest_weight }} lbs{% else %}—{% endif %}
+        </td>
+        <td class="px-4 py-2">{% if cow.pasture %}{{ cow.pasture.name }}{% else %}—{% endif %}</td>
+        <td class="px-4 py-2 text-right">
+          <form method="post" action="{% url 'delete_cattle' cow.pk %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this animal?');">
+            {% csrf_token %}
+            <button type="submit" class="text-red-600 hover:underline" title="Delete">🗑️</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="10" class="px-4 py-4 text-center text-gray-500">No cattle found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+<!-- DataTables core -->
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<!-- Buttons deps (MUST come before buttons.html5) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<!-- DataTables Buttons (no CSS loaded, we override to emoji-only) -->
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+
+<!-- Leaflet JS (optional) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const table = $('#cattleTable').DataTable({
+    dom: 'Bfrtip',
+    paging: true,
+    searching: true,
+    ordering: true,
+
+
+    // 🔒 Make the last column (Actions) not sortable/searchable
+    columnDefs: [
+      { orderable: false, searchable: false, targets: -1 }
+    ],
+	
+    // ✅ Use the object form so we don't overwrite the buttons config
+    buttons: {
+      dom: {
+        // render as <a> so there’s no default button chrome
+        button: { tag: 'a', className: 'dt-emoji' }
+      },
+      buttons: [
+        { extend: 'copyHtml5',  text: '📋', titleAttr: 'Copy' },
+        { extend: 'csvHtml5',   text: '🧾', titleAttr: 'Export CSV' },
+        { extend: 'excelHtml5', text: '📊', titleAttr: 'Export Excel' },
+        { extend: 'pdfHtml5',   text: '📄', titleAttr: 'Export PDF' },
+        { extend: 'print',      text: '🖨️', titleAttr: 'Print Table' }
+      ]
+    }
+  });
+
+  // Put the emoji icons next to the ➕ Add link
+  table.buttons().container().appendTo('#datatable-buttons');
+
+  // Keep the visible count updated
+  function updateVisibleCount() {
+    const visible = table.rows({ filter: 'applied' }).count();
+    const el = document.getElementById('dt-visible-count');
+    if (el) el.textContent = Number(visible).toLocaleString();
+  }
+  updateVisibleCount();
+  table.on('draw', updateVisibleCount);
+});
+</script>
+{% endblock %}

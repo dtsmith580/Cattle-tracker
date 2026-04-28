@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-3">
+  <h2 class="mb-4">🐮 Breeding Records</h2>
+
+  <!-- Breeding Form -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+      {{ form.instance.pk|yesno:"✏️ Edit Breeding Record,➕ New Breeding Record" }}
+    </div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">💾 Save</button>
+        <a href="{% url 'breeding_admin' %}" class="btn btn-outline-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table of Recent Records -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>📋 Recent Breeding Records</span>
+      <div class="d-none d-md-block">
+        <button class="btn btn-sm btn-outline-primary" onclick="window.print()">🖨 Print</button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Cow</th>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Sire</th>
+            <th>Cleanup</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in breeding_records %}
+          <tr>
+            <td>{{ record.cow.ear_tag }}</td>
+            <td>{{ record.breeding_date }}</td>
+            <td>{{ record.get_method_display }}</td>
+            <td>
+              {% if record.method == 'ai' and record.herd_sire %}
+                {{ record.herd_sire.name }} (AI)
+              {% elif record.bull %}
+                {{ record.bull.ear_tag }} (Bull)
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              {% if record.cleanup_method == 'ai' and record.cleanup_herd_sire %}
+                {{ record.cleanup_herd_sire.name }} (AI)
+              {% elif record.cleanup_method == 'natural' and record.cleanup_sire %}
+                {{ record.cleanup_sire.ear_tag }} (Bull)
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <a href="{% url 'edit_breeding_record' record.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'delete_breeding_record' record.id %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?')">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-muted text-center">No records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const methodSelect = document.querySelector("#id_method");
+    const herdSireField = document.querySelector("#id_herd_sire").closest("p");
+    const bullField = document.querySelector("#id_bull").closest("p");
+
+    function toggleSireFields() {
+      const method = methodSelect.value;
+      if (method === "ai") {
+        herdSireField.style.display = "block";
+        bullField.style.display = "none";
+      } else {
+        herdSireField.style.display = "none";
+        bullField.style.display = "block";
+      }
+    }
+
+    if (methodSelect && herdSireField && bullField) {
+      methodSelect.addEventListener("change", toggleSireFields);
+      toggleSireFields(); // initial call
+    }
+  });
+</script>
+{% endblock %}

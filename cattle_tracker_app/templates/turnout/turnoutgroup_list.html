@@ -1,0 +1,30 @@
+{# templates/turnout/turnoutgroup_list.html #}
+{% extends "base.html" %}
+{% block title %}Turnout Groups{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-semibold">Turnout Groups</h1>
+    <a class="px-3 py-2 rounded bg-green-600 text-white" href="{% url 'add_turnout_group' %}">Add Group</a>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow">
+    <table class="min-w-full">
+      <thead><tr><th class="p-3 text-left">Name</th><th class="p-3 text-left">Turn-in</th><th class="p-3 text-left">Turn-out</th><th class="p-3">Actions</th></tr></thead>
+      <tbody>
+        {% for g in groups %}
+          <tr class="border-t border-gray-200 dark:border-gray-700">
+            <td class="p-3">
+              <a class="text-green-700 hover:underline" href="{% url 'turnoutgroup_detail' g.pk %}">{{ g.name }}</a>
+            </td>
+            <td class="p-3">{{ g.turn_in_date|date:"Y-m-d" }}</td>
+            <td class="p-3">{{ g.turn_out_date|date:"Y-m-d"|default:"—" }}</td>
+            
+          </tr>
+        {% empty %}
+          <tr><td class="p-4 text-gray-500" colspan="4">No turnout groups yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

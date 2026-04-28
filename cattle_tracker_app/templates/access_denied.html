@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5 text-center">
+  <h2>Access Denied</h2>
+  <p>Sorry {{ request.user.username }}, you don't have access to this page.</p>
+
+  {% if allowed_owners %}
+    <p>You have access to the following Ranches:</p>
+    <ul>
+      {% for owner in allowed_owners %}
+        <li>{{ owner.name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>You don’t have access to any Ranches right now. Please contact an admin.</p>
+  {% endif %}
+
+  <a href="/" class="btn btn-outline-primary mt-3">← Back to Home</a>
+</div>
+
+{% endblock %}

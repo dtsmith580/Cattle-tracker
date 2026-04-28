@@ -1,0 +1,26 @@
+<div class="flex items-center justify-between mb-3">
+  <h2 class="text-lg font-semibold">Health Overview</h2>
+  <div class="flex items-center gap-2">
+    {# Preferred: add page that preselects this animal #}
+    {# If you have a route like path('health/add/<int:cattle_pk>/', ...) named 'health_create_for_cattle' #}
+    {% if cattle %}
+      <a href="{% url 'health_create_for_cattle' cattle.pk %}?next={% url 'view_cattle' cattle.pk %}"
+         class="inline-flex items-center px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700">
+        + Add Record
+      </a>
+    {% else %}
+      <a href="{% url 'health_create' %}"
+         class="inline-flex items-center px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700">
+        + Add Record
+      </a>
+    {% endif %}
+
+    {# View all health records for this animal #}
+    {% if cattle %}
+      <a href="{% url 'cattle_health_list' cattle.pk %}"
+         class="inline-flex items-center px-3 py-1.5 rounded border hover:bg-gray-50">
+        View All
+      </a>
+    {% endif %}
+  </div>
+</div>

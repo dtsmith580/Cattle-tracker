@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% load group_filters %}
+{% block title %}Cattle Sales Report  </div>
+</div></div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+<h2 class="mb-4 text-center">📈 Cattle Sales Report</h2>
+
+<div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+  <strong class="align-self-center">Quick Filters:</strong>
+  <button type="button" class="btn btn-outline-secondary {% if request.GET.range == '30' %}active{% endif %}" onclick="setDateRange('30')">Last 30 Days</button>
+  <button type="button" class="btn btn-outline-secondary {% if request.GET.range == 'last_month' %}active{% endif %}" onclick="setDateRange('last_month')">Last Month</button>
+  <button type="button" class="btn btn-outline-secondary {% if request.GET.range == 'quarter' %}active{% endif %}" onclick="setDateRange('quarter')">This Quarter</button>
+  <button type="button" class="btn btn-outline-secondary {% if not request.GET.range and not calendar_year %}active{% endif %}" onclick="clearDateRange()">Custom</button>
+</div>
+
+<form method="get" id="filterForm" class="bg-dark p-3 rounded shadow-sm mb-4 text-white border border-secondary">
+  <div class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Start Date:</label>
+      <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">End Date:</label>
+      <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Calendar Year:</label>
+      <select name="year" id="calendarYearSelect" class="form-select">
+        <option value="">-- Select Year --</option>
+        {% for y in years %}
+          <option value="{{ y|date:'Y' }}" {% if calendar_year == y|date:'Y' %}selected{% endif %}>{{ y|date:"Y" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+    </div>
+  </div>
+  <div class="mt-3">
+    <a href="?" class="btn btn-sm btn-outline-danger">Reset Filters</a>
+  </div>
+</form>
+
+{% if sales %}
+<div class="d-flex justify-content-end mb-3">
+  <div id="buttonWrapper">
+    <div class="btn-group">
+      <button class="btn btn-sm btn-outline-primary export-btn" onclick="exportTable('csv')">Export CSV</button>
+      <button class="btn btn-sm btn-outline-success export-btn" onclick="exportTable('excel')">Export Excel</button>
+      <button class="btn btn-sm btn-outline-danger export-btn" onclick="exportTable('pdf')">Export PDF</button>
+      <button class="btn btn-sm btn-outline-secondary export-btn" onclick="exportTable('print')">Print</button>
+    </div>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table id="cattleSalesTable" class="table table-bordered table-hover align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th>
+        <th>Ear Tag</th>
+        <th>Owner</th>
+        <th>Sale Date</th>
+        <th>Animal Type</th>
+        <th>Sold To</th>
+        <th>Sale Price</th>
+        <th>Age at Sale</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cattle in sales %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ cattle.ear_tag }}</td>
+        <td>{{ cattle.owner }}</td>
+        <td>{{ cattle.sale_date }}</td>
+        <td>{{ cattle.animal_type }}</td>
+        <td>{{ cattle.sold_to|default:"—" }}</td>
+        <td>${{ cattle.sale_price|floatformat:2|default:"0.00" }}</td>
+        <td>{{ cattle.age_at_sale }}</td>
+        <td>{{ cattle.notes|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="table-light">
+      <tr>
+        <th colspan="7" class="text-end">Total Sales:</th>
+        <th colspan="2">${{ total_sales|floatformat:2 }}</th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% else %}
+  <p class="text-center text-muted">No cattle sold in the selected range.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setDateRange(range) {
+  const startInput = document.querySelector('input[name="start_date"]');
+  const endInput = document.querySelector('input[name="end_date"]');
+  const yearSelect = document.getElementById('calendarYearSelect');
+  const now = new Date();
+  let start, end;
+  switch (range) {
+    case '30':
+      end = new Date();
+      start = new Date();
+      start.setDate(end.getDate() - 30);
+      break;
+    case 'last_month':
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0);
+      break;
+    case 'quarter':
+      const quarter = Math.floor(now.getMonth() / 3);
+      start = new Date(now.getFullYear(), quarter * 3, 1);
+      end = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+      break;
+  }
+  if (start && end) {
+    startInput.value = start.toISOString().split('T')[0];
+    endInput.value = end.toISOString().split('T')[0];
+    yearSelect.value = '';
+    const form = startInput.form;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'range';
+    input.value = range;
+    form.appendChild(input);
+    form.submit();
+  }
+}
+
+function clearDateRange() {
+  document.querySelector('input[name="start_date"]').value = '';
+  document.querySelector('input[name="end_date"]').value = '';
+}
+
+$(document).ready(function () {
+  $('#cattleSalesTable').DataTable({
+    paging: true,
+    searching: true,
+    ordering: true
+  });
+});
+</script>
+{% endblock %}

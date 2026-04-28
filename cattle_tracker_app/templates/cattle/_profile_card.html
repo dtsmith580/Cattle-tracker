@@ -1,0 +1,91 @@
+<div class="bg-white shadow rounded-lg p-6 space-y-4 mx-auto w-full max-w-screen-sm" id="cattle-card">
+  {% if cattle.image %}
+    <div class="mb-2 md:mb-0 md:flex-shrink-0">
+      <img src="{{ cattle.image.url }}" alt="Photo of {{ cattle.ear_tag }}" class="rounded-lg h-48 w-auto mb-4 object-contain border border-gray-200 shadow-sm hover:cursor-zoom-in" onclick="openImageModal('{{ cattle.image.url }}')">
+    </div>
+  {% else %}
+    <div class="mb-4 text-sm text-gray-500 italic field-display">No image uploaded.</div>
+  {% endif %}
+
+  <div class="flex-1">
+    <!-- changed: remove inline onclick, add data-action -->
+    <button type="button" class="edit-btn float-right" data-action="toggle-edit">✏️</button>
+
+    <form id="cattle-image-form" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div id="image-edit-section" class="hidden space-y-2 mb-2">
+        <input name="image" type="file" accept="image/*" onchange="autoSaveImage(this)" />
+        {% if cattle.image %}
+          <button type="button" class="text-sm text-red-600" onclick="deleteImage()">🗑️ Delete Image</button>
+        {% endif %}
+      </div>
+    </form>
+
+    <p><strong>Ownership:</strong>
+      {% if cattle.owner %}
+        <span class="field-display">{{ cattle.owner.name }}</span>
+      {% else %}
+        <span class="field-display text-gray-400 italic">No owner assigned</span>
+      {% endif %}
+      <select class="field-input hidden" name="owner">
+        {% for owner in owners %}
+          <option value="{{ owner.id }}" {% if cattle.owner and cattle.owner.id == owner.id %}selected{% endif %}>
+            {{ owner.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </p>
+
+    <p><strong>Pasture:</strong>
+    <span class="field-display">
+    {% if cattle.pasture %}{{ cattle.pasture.name }}{% else %}—{% endif %}
+    </span>
+
+  <select class="field-input hidden" name="pasture">
+ 
+    <option value="">— Select Pasture —</option>
+    {% for p in pasture_options %}
+      <option value="{{ p.id }}" {% if cattle.pasture and cattle.pasture.id == p.id %}selected{% endif %}>
+        {{ p.name }}
+      </option>
+    {% endfor %}
+  </select>
+</p>
+
+
+
+	
+    <p><strong>Ear Tag:</strong>
+      <span class="field-display">{{ cattle.ear_tag }}</span>
+      <input class="field-input hidden" name="ear_tag" type="text" value="{{ cattle.ear_tag }}" />
+    </p>
+
+    <p><strong>Breed:</strong>
+      <span class="field-display">{{ cattle.breed }}</span>
+      <input class="field-input hidden" name="breed" type="text" value="{{ cattle.breed }}" />
+    </p>
+
+    <p><strong>Date of Birth:</strong>
+      <span class="field-display">{{ cattle.dob|date:"Y-m-d" }}</span>
+      <input class="field-input hidden" name="dob" type="date" value="{{ cattle.dob|date:'Y-m-d' }}" />
+    </p>
+
+    <p><strong>Sex:</strong>
+      <span class="field-display">{{ cattle.get_sex_display }}</span>
+      <select class="field-input hidden" name="sex">
+        {% for key, val in cattle.SEX_CHOICES %}
+          <option value="{{ key }}" {% if cattle.sex == key %}selected{% endif %}>{{ val }}</option>
+        {% endfor %}
+      </select>
+    </p>
+
+    <p><strong>Status:</strong>
+      <span class="field-display">{{ cattle.get_status_display }}</span>
+      <select class="field-input hidden" name="status">
+        {% for key, val in cattle.STATUS_CHOICES %}
+          <option value="{{ key }}" {% if cattle.status == key %}selected{% endif %}>{{ val }}</option>
+        {% endfor %}
+      </select>
+    </p>
+  </div>
+</div>

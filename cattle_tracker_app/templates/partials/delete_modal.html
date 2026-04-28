@@ -1,0 +1,75 @@
+{% comment %} reusable_delete_modal.html {% endcomment %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete <strong id="deleteCowTag"></strong>?
+      </div>
+      <div class="modal-footer">
+        <form id="deleteCowForm" method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  body.modal-open {
+    overflow: auto;
+    padding-right: 0 !important;
+  }
+  .modal-backdrop.show {
+    opacity: 0.5;
+  }
+</style>
+
+<script>
+  $(document).ready(function () {
+    $(document).on('click', 'a[data-bs-target="#deleteModal"]', function (e) {
+      e.preventDefault();
+      const btn = $(this);
+      $('#deleteCowTag').text(btn.data('ear-tag'));
+      $('#deleteCowForm').attr('action', btn.data('url'));
+      const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+      modal.show();
+    });
+
+    $('#deleteCowForm').on('submit', function (e) {
+      e.preventDefault();
+      const url = $(this).attr('action');
+      const token = $(this).find('[name="csrfmiddlewaretoken"]').val();
+
+      $.ajax({
+        url: url,
+        type: 'POST',
+        headers: {
+          'X-CSRFToken': token,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function (response) {
+          if (response.status === 'ok') {
+            const row = $(`a[data-url="${url}"]`).closest('tr');
+            row.remove();
+            const modalEl = document.getElementById('deleteModal');
+            bootstrap.Modal.getInstance(modalEl).hide();
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open').css('padding-right', '');
+          } else {
+            alert('⚠ Delete failed: ' + response.status);
+          }
+        },
+        error: function (xhr, status, error) {
+          console.error("❌ Delete error:", status, error);
+          alert('Error occurred while deleting.');
+        }
+      });
+    });
+  });
+</script>

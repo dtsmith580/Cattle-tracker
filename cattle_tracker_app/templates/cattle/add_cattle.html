@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<form id="add-cattle-form" method="post" enctype="multipart/form-data" class="max-w-screen-md mx-auto space-y-6">
+  {% csrf_token %}
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="rounded p-4 {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Basic Information -->
+  <div>
+    <h2 class="text-lg font-semibold">🐮 Basic Info</h2>
+    <hr class="my-2">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {% for field in form.visible_fields %}
+        {% if field.name in "ear_tag registration_number dob sex animal_type pregnancy_status breed" %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
+            {% if field.errors %}<p class="text-sm text-red-600">{{ field.errors }}</p>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Breeding Information -->
+  <div id="breeding-info-section" class="transition-opacity duration-500 opacity-0 hidden">
+    <h2 class="text-lg font-semibold">🍼 Breeding Info</h2>
+    <hr class="my-2">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700">{{ form.breeding_method.label }}</label>
+        {{ form.breeding_method }}
+        {% if form.breeding_method.errors %}<p class="text-sm text-red-600">{{ form.breeding_method.errors }}</p>{% endif %}
+      </div>
+      <div id="sire-field" class="transition-opacity duration-500 opacity-0 hidden">
+        <label class="block text-sm font-medium text-gray-700">{{ form.sire.label }}</label>
+        {{ form.sire }}
+        {% if form.sire.errors %}<p class="text-sm text-red-600">{{ form.sire.errors }}</p>{% endif %}
+      </div>
+      <div id="herd-sire-field" class="transition-opacity duration-500 opacity-0 hidden">
+        <label class="block text-sm font-medium text-gray-700">{{ form.herd_sire.label }}</label>
+        {{ form.herd_sire }}
+        {% if form.herd_sire.errors %}<p class="text-sm text-red-600">{{ form.herd_sire.errors }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Ownership -->
+  <div id="owner-field-wrapper">
+    <h2 class="text-lg font-semibold">🏷 Ownership</h2>
+    <hr class="my-2">
+    <div>
+      <label class="block text-sm font-medium text-gray-700">{{ form.owner.label }}</label>
+      {{ form.owner }}
+      {% if form.owner.errors %}<p class="text-sm text-red-600">{{ form.owner.errors }}</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Photo Upload -->
+  <div>
+    <h2 class="text-lg font-semibold">📷 Photo</h2>
+    <hr class="my-2">
+    <div>
+      <label class="block text-sm font-medium text-gray-700">{{ form.photo.label }}</label>
+      {{ form.photo }}
+      {% if form.photo.errors %}<p class="text-sm text-red-600">{{ form.photo.errors }}</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Save / Cancel Buttons -->
+  <div class="pt-4">
+    <button id="save-button" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+      <span id="save-button-text">Save</span>
+    </button>
+    <a href="{% url 'cattle_list' %}" class="ml-4 text-gray-600 hover:underline">Cancel</a>
+  </div>
+</form>
+
+<!-- Toast Notification -->
+<div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow hidden">
+  ✅ Saved Successfully!
+</div>
+
+<script>
+// JS logic remains unchanged
+{{ block.super }}
+</script>
+
+{% endblock %}

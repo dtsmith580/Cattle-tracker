@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Cattle Tracker{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 220px;
+      background-color: #343a40;
+      color: white;
+      padding-top: 1rem;
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .sidebar a {
+      color: white;
+      display: block;
+      padding: 10px 20px;
+      text-decoration: none;
+    }
+
+    .sidebar a:hover {
+      background-color: #495057;
+    }
+
+    .sidebar.hidden {
+      transform: translateX(-100%);
+      position: absolute;
+      z-index: 1000;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 1.5rem;
+      margin-left: 220px;
+    }
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        height: 100vh;
+        top: 0;
+        left: 0;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.show {
+        transform: translateX(0);
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+
+      .toggle-btn {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1101;
+      }
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Toggle button for small screens -->
+  <button class="btn btn-dark toggle-btn d-md-none" onclick="toggleSidebar()">☰ Menu</button>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <h4 class="text-center">🐄 Cattle Tracker</h4>
+      <hr>
+      <a href="/dashboard/" class="{% if request.path == '/dashboard/' %}bg-secondary{% endif %}">📊 Dashboard</a>
+      <a href="/admin/cattle_tracker/cattle/" class="{% if request.path|slice:'0:28' == '/admin/cattle_tracker/cattle' %}bg-secondary{% endif %}">🐮 Cattle</a>
+      <a href="/admin/cattle_tracker/breedinghistory/" class="{% if request.path|slice:'0:36' == '/admin/cattle_tracker/breedinghistory' %}bg-secondary{% endif %}">❤️ Breeding</a>
+      <a href="/admin/cattle_tracker/alert/" class="{% if request.path|slice:'0:30' == '/admin/cattle_tracker/alert' %}bg-secondary{% endif %}">🚨 Alerts</a>
+      <a href="#">📄 Reports</a>
+      <hr>
+      <a href="/admin/">⚙️ Admin</a>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      {% block content %}
+      {% endblock %}
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('show');
+    }
+  </script>
+
+</body>
+</html>

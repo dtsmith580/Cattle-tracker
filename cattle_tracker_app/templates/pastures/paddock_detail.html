@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Paddock {{ paddock.name }}{% endblock %}
+
+{% block extra_head %}
+<!--
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+-->
+  <link rel="stylesheet" href="{% static 'vendor/leaflet-draw/leaflet.draw.css' %}">
+  <script src="{% static 'vendor/leaflet-draw/leaflet.draw.js' %}"></script>
+<!--
+  <script src="{% static 'vendor/turf.min.js' %}"></script>
+  <script src="{% static 'js/maploader.js' %}"></script>
+-->
+<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'vendor/turf.min.js' %}"></script>
+<script src="{% static 'js/map/geojson_map_utils.js' %}"></script>
+
+
+
+  <style>
+    #paddock-map {
+      height: 60vh;
+      min-height: 420px;
+      border-radius: 0.75rem;
+    }
+  </style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+  <!-- Header / Breadcrumb -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div>
+      <div class="text-sm text-gray-500 flex items-center gap-2">
+        <a href="{% url 'pasture_list' %}" class="hover:text-gray-700">Pastures</a>
+        <span>/</span>
+        {% if pasture %}
+          <a href="{% url 'pasture_detail' pasture.pk %}" class="hover:text-gray-700">
+            {{ pasture.name }}
+          </a>
+          <span>/</span>
+        {% endif %}
+        <span class="text-gray-900 font-medium">Paddock {{ paddock.name }}</span>
+      </div>
+      <h1 class="mt-1 text-2xl font-semibold text-gray-900">
+        Paddock {{ paddock.name }}
+      </h1>
+      {% if paddock.ear_tag %}
+        <p class="text-sm text-gray-500">ID: {{ paddock.ear_tag }}</p>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if pasture %}
+        <a href="{% url 'pasture_detail' pasture.pk %}"
+           class="inline-flex items-center px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+          ← Back to {{ pasture.name }}
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- Left: Stats + Map -->
+    <div class="space-y-6 lg:col-span-2">
+      <!-- Stats card -->
+      <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5">
+        <h2 class="text-sm font-medium text-gray-700 mb-3">
+          Paddock Summary
+        </h2>
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <dt class="text-xs text-gray-500 uppercase tracking-wide">Paddock Acres</dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900" id="paddock-acres-display">
+              {% if paddock_acres %}
+                {{ paddock_acres|floatformat:1 }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 uppercase tracking-wide">Parent Pasture</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              {% if pasture %}
+                <a href="{% url 'pasture_detail' pasture.pk %}"
+                   class="text-emerald-700 hover:text-emerald-900 font-medium">
+                  {{ pasture.name }}
+                </a>
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 uppercase tracking-wide">Status</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              {{ paddock.status|default:"Active" }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 uppercase tracking-wide">Animals</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              {{ paddock.current_headcount|default:"0" }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Map card -->
+      <section class="bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div>
+            <h2 class="text-sm font-medium text-gray-700">Paddock Map</h2>
+            <p class="text-xs text-gray-500">
+              Draw or edit the paddock boundary. Parent pasture is shown for context.
+            </p>
+          </div>
+          <div class="text-xs text-gray-500">
+            Editing is {{ user.is_authenticated|yesno:"enabled,disabled" }}.
+          </div>
+        </div>
+
+        <div
+          id="paddock-map"
+          class="bg-slate-100"
+          data-paddock-geojson="{{ paddock_geojson|default:''|escapejs }}"
+          data-pasture-geojson="{{ pasture_geojson|default:''|escapejs }}"
+          data-boundary-save-url="{% url 'paddock_update_boundary' paddock.id %}"
+        ></div>
+      </section>
+    </div>
+
+    <!-- Right: Editable details panel -->
+    <aside class="space-y-6">
+      <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5">
+        <h2 class="text-sm font-medium text-gray-700 mb-3">Paddock Details</h2>
+        <dl class="space-y-3 text-sm">
+          <!-- Name -->
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <dt class="text-xs text-gray-500 uppercase tracking-wide">Name</dt>
+              <dd
+                class="mt-1 inline-edit"
+                data-field="name"
+                data-url="{% url 'paddock_update_field' paddock.pk %}"
+              >
+                <span class="inline-edit-display font-medium text-gray-900">
+                  {{ paddock.name }}
+                </span>
+                <input type="text" class="inline-edit-input hidden w-full border rounded px-1 py-0.5 text-sm" />
+              </dd>
+            </div>
+            <button type="button"
+                    class="inline-edit-toggle text-xs text-emerald-700 hover:text-emerald-900">
+              Edit
+            </button>
+          </div>
+
+          <!-- Status -->
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <dt class="text-xs text-gray-500 uppercase tracking-wide">Status</dt>
+              <dd
+                class="mt-1 inline-edit"
+                data-field="status"
+                data-url="{% url 'paddock_update_field' paddock.pk %}"
+              >
+                <span class="inline-edit-display text-gray-900">
+                  {{ paddock.status|default:"Active" }}
+                </span>
+                <input type="text" class="inline-edit-input hidden w-full border rounded px-1 py-0.5 text-sm" />
+              </dd>
+            </div>
+            <button type="button"
+                    class="inline-edit-toggle text-xs text-emerald-700 hover:text-emerald-900">
+              Edit
+            </button>
+          </div>
+
+          <!-- Notes -->
+          <div>
+            <dt class="text-xs text-gray-500 uppercase tracking-wide flex justify-between items-center">
+              <span>Notes</span>
+              <button type="button"
+                      class="inline-edit-toggle text-xs text-emerald-700 hover:text-emerald-900">
+                Edit
+              </button>
+            </dt>
+            <dd
+              class="mt-1 inline-edit"
+              data-field="notes"
+              data-url="{% url 'paddock_update_field' paddock.pk %}"
+            >
+              <span class="inline-edit-display block text-gray-900 whitespace-pre-wrap">
+                {{ paddock.notes|default:"No notes yet." }}
+              </span>
+              <textarea
+                class="inline-edit-input hidden w-full border rounded px-2 py-1 text-sm"
+                rows="4"
+              ></textarea>
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+  (function () {
+    console.log("[PaddockDetail] inline script loaded");
+
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return "";
+    }
+
+    // Handle weird \u0022 encoding and normal JSON both
+    function parseGeoJsonFromData(raw, label) {
+      if (!raw || !raw.trim()) return null;
+      let str = raw.trim();
+
+      // First, try as-is
+      try {
+        return JSON.parse(str);
+      } catch (e1) {
+        // Try to "unescape" \u0022 etc.
+        try {
+          const fixed = str
+            .replace(/\\u0022/g, '"')
+            .replace(/\\u0027/g, "'")
+            .replace(/\\u002D/g, "-");
+          return JSON.parse(fixed);
+        } catch (e2) {
+          console.error(
+            `[PaddockDetail] Failed to parse ${label} GeoJSON even after unescape`,
+            e2,
+            raw
+          );
+          return null;
+        }
+      }
+    }
+
+    // Inline text/notes editor – unchanged
+    function attachInlineEditors(root) {
+      const containers = root.querySelectorAll(".inline-edit");
+      containers.forEach(container => {
+        const displayEl = container.querySelector(".inline-edit-display");
+        const inputEl   = container.querySelector(".inline-edit-input");
+        const field     = container.dataset.field;
+        const url       = container.dataset.url;
+
+        let toggleBtn = container.closest("div").parentElement.querySelector(".inline-edit-toggle");
+        if (!toggleBtn) {
+          toggleBtn = container.parentElement.querySelector(".inline-edit-toggle");
+        }
+        if (!toggleBtn || !displayEl || !inputEl || !field || !url) return;
+
+        function enterEdit() {
+          inputEl.value = (displayEl.textContent || "").trim();
+          displayEl.classList.add("hidden");
+          inputEl.classList.remove("hidden");
+          inputEl.focus();
+          toggleBtn.textContent = "Save";
+        }
+
+        function exitEdit() {
+          displayEl.classList.remove("hidden");
+          inputEl.classList.add("hidden");
+          toggleBtn.textContent = "Edit";
+        }
+
+        async function save() {
+          const value = inputEl.value;
+          try {
+            const resp = await fetch(url, {
+              method: "POST",
+              headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-CSRFToken": getCookie("csrftoken"),
+              },
+              body: new URLSearchParams({ field, value }),
+            });
+            if (!resp.ok) throw new Error("Save failed");
+            const data = await resp.json();
+            displayEl.textContent = data.value || "";
+          } catch (err) {
+            console.error("[PaddockDetail] inline save error", err);
+          } finally {
+            exitEdit();
+          }
+        }
+
+        let editing = false;
+
+        toggleBtn.addEventListener("click", () => {
+          if (!editing) {
+            editing = true;
+            enterEdit();
+          } else {
+            editing = false;
+            save();
+          }
+        });
+
+        inputEl.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" && !(inputEl.tagName === "TEXTAREA" && ev.shiftKey)) {
+            ev.preventDefault();
+            editing = false;
+            save();
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            editing = false;
+            exitEdit();
+          }
+        });
+      });
+    }
+
+    // Fallback map init if MapLoader.loadPaddockDetail is missing
+    function initPaddockMapFallback(mapEl) {
+      console.warn("[PaddockDetail] Using fallback paddock map init");
+
+      if (typeof L === "undefined") {
+        console.error("[PaddockDetail] Leaflet L is undefined. Check leaflet.js include.");
+        return;
+      }
+
+      const rawPaddock = mapEl.dataset.paddockGeojson || "";
+      const rawPasture = mapEl.dataset.pastureGeojson || "";
+      const boundarySaveUrl = mapEl.dataset.boundarySaveUrl || null;
+
+      const paddockObj = parseGeoJsonFromData(rawPaddock, "paddock (fallback)");
+      const pastureObj = parseGeoJsonFromData(rawPasture, "pasture (fallback)");
+
+      // Base layers (Street & Satellite)
+      const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 22,
+        attribution: "&copy; OpenStreetMap contributors",
+      });
+
+      const satelliteLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxZoom: 22,
+          attribution: "Tiles &copy; Esri",
+        }
+      );
+
+      const map = L.map(mapEl, {
+        layers: [streetLayer], // default base
+      });
+
+      const drawnItems = new L.FeatureGroup().addTo(map);
+      let pastureLayer = null;
+      let bounds = null;
+
+      // Paddock geometry (editable)
+      if (paddockObj) {
+        const paddockGroup = L.geoJSON(paddockObj, {
+          style: {
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.2,
+          },
+        });
+
+        paddockGroup.eachLayer(function (layer) {
+          drawnItems.addLayer(layer);
+        });
+
+        paddockGroup.addTo(map);
+        bounds = paddockGroup.getBounds();
+      }
+
+      // Pasture geometry (non-editable)
+      if (pastureObj) {
+        pastureLayer = L.geoJSON(pastureObj, {
+          style: {
+            weight: 1,
+            dashArray: "4 2",
+            opacity: 0.7,
+            fillOpacity: 0,
+          },
+        }).addTo(map);
+
+        if (bounds) {
+          bounds = bounds.extend(pastureLayer.getBounds());
+        } else {
+          bounds = pastureLayer.getBounds();
+        }
+      }
+
+      const fallbackLatLng = [34.0, -96.8];
+      if (bounds && bounds.isValid && bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [20, 20] });
+      } else {
+        map.setView(fallbackLatLng, 16);
+      }
+
+      // Base + overlay layer control (top-right)
+      const baseLayers = {
+        Streets: streetLayer,
+        Satellite: satelliteLayer,
+      };
+
+      const overlays = {
+        "Paddock Boundary": drawnItems,
+      };
+      if (pastureLayer) {
+        overlays["Pasture Boundary"] = pastureLayer;
+      }
+
+      L.control.layers(baseLayers, overlays, {
+        position: "topright",
+        collapsed: false,
+      }).addTo(map);
+
+      // Draw control for paddock editing (top-right, under layer switcher)
+      const drawControl = new L.Control.Draw({
+        position: "topright",
+        edit: {
+          featureGroup: drawnItems,
+        },
+        draw: {
+          polygon: true,
+          polyline: false,
+          rectangle: false,
+          circle: false,
+          circlemarker: false,
+          marker: false,
+        },
+      });
+      map.addControl(drawControl);
+
+      async function saveFeatureToServer(geojsonFeature) {
+        if (!boundarySaveUrl) {
+          console.warn("[PaddockDetail] No boundarySaveUrl, cannot save");
+          return;
+        }
+        try {
+          const headers = {
+            "Content-Type": "application/json",
+          };
+          const csrf = getCookie("csrftoken");
+          if (csrf) headers["X-CSRFToken"] = csrf;
+
+          const resp = await fetch(boundarySaveUrl, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(geojsonFeature),
+          });
+
+          const text = await resp.text().catch(() => "");
+          if (!resp.ok && resp.status !== 204) {
+            console.error("[PaddockDetail] Fallback save failed", resp.status, text);
+            alert("Could not save paddock boundary.");
+          } else {
+            console.info("[PaddockDetail] Fallback save success", resp.status, text.slice(0, 200));
+          }
+        } catch (e) {
+          console.error("[PaddockDetail] Fallback save exception", e);
+          alert("Could not save paddock boundary.");
+        }
+      }
+
+      map.on(L.Draw.Event.CREATED, function (e) {
+        const layer = e.layer;
+        drawnItems.clearLayers();
+        drawnItems.addLayer(layer);
+
+        const feature = layer.toGeoJSON(); // Feature with geometry + properties
+        console.log("[PaddockDetail] fallback draw:created", feature);
+        saveFeatureToServer(feature);
+      });
+
+      map.on(L.Draw.Event.EDITED, function (e) {
+        e.layers.eachLayer(function (layer) {
+          const feature = layer.toGeoJSON();
+          console.log("[PaddockDetail] fallback draw:edited", feature);
+          saveFeatureToServer(feature);
+        });
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      console.log("[PaddockDetail] DOMContentLoaded");
+      attachInlineEditors(document);
+
+      const mapEl = document.getElementById("paddock-map");
+      if (!mapEl) return;
+
+      const rawPaddock = mapEl.dataset.paddockGeojson || "";
+      const rawPasture = mapEl.dataset.pastureGeojson || "";
+      const boundarySaveUrl = mapEl.dataset.boundarySaveUrl || null;
+
+      // If MapLoader.loadPaddockDetail exists (new JS is loaded), use it
+      if (window.MapLoader && typeof MapLoader.loadPaddockDetail === "function") {
+        const paddockFeature = parseGeoJsonFromData(rawPaddock, "paddock");
+        const pastureFeature = parseGeoJsonFromData(rawPasture, "pasture");
+
+        console.log("[PaddockDetail] calling MapLoader.loadPaddockDetail", {
+          paddockFeature,
+          pastureFeature,
+          boundarySaveUrl
+        });
+
+        MapLoader.loadPaddockDetail({
+          el: mapEl,
+          paddockFeature,
+          pastureFeature,
+          boundarySaveUrl: boundarySaveUrl,
+          getCSRF: () => getCookie("csrftoken"),
+          showLayerToggle: true,
+          enableEdit: true,
+          onStats: function (stats) {
+            if (stats && typeof stats.acres === "number") {
+              const el = document.getElementById("paddock-acres-display");
+              if (el) el.textContent = stats.acres.toFixed(1);
+            }
+            console.log("[PaddockDetail] stats", stats);
+          }
+        });
+      } else {
+        console.warn("[PaddockDetail] MapLoader.loadPaddockDetail not available, using fallback", {
+          hasMapEl: !!mapEl,
+          hasMapLoader: !!window.MapLoader
+        });
+        initPaddockMapFallback(mapEl);
+      }
+    });
+  })();
+</script>
+
+{% endblock content %}

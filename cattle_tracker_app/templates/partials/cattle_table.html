@@ -1,0 +1,76 @@
+<div class="table-responsive">
+  <table id="cattleTable" class="table table-hover table-bordered align-middle datatable table-sm w-100">
+    <thead class="table-light">
+      <tr>
+        <th><input type="checkbox" id="select-all" onclick="toggleAllCheckboxes(this)" /></th>
+        <th>Owner</th>
+        <th>Ear Tag</th>
+        <th>DOB</th>
+        <th>Age</th>
+        <th>Animal Type</th>
+        <th>Preg Status</th>
+        <th style="width: 60px;">Photo</th>
+        <th>Breed</th>
+        <th>Status</th>
+        <th>Sire Type</th>
+        <th>Reg #</th>
+        <th style="min-width: 120px;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cow in cattle_list %}
+      <tr>
+        <td><input type="checkbox" name="selected_cattle" value="{{ cow.id }}"></td>
+        <td>{{ cow.owner.name|default:"Unassigned" }}</td>
+        <td>{{ cow.ear_tag }}</td>
+        <td>{{ cow.dob }}</td>
+        <td>{{ cow.age }}</td>
+        <td>{{ cow.get_animal_type_display }}</td>
+        <td>
+          {% if cow.pregnancy_status == 'bred' %}<span class="badge bg-success">Bred</span>
+          {% elif cow.pregnancy_status == 'open' %}<span class="badge bg-warning text-dark">Open</span>
+          {% else %}<span class="text-muted">&mdash;</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if cow.photo %}
+            <img src="{{ cow.photo.url }}" class="img-thumbnail" style="width: 50px; height: 35px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#photoModal{{ cow.id }}">
+          {% else %}<span class="badge bg-secondary">No Photo</span>
+          {% endif %}
+        </td>
+        <td>{{ cow.breed }}</td>
+        <td>
+          {% if cow.status == 'alive' %}<span class="badge bg-primary">Alive</span>
+          {% elif cow.status == 'sold' %}<span class="badge bg-secondary">Sold</span>
+          {% elif cow.status == 'dead' %}<span class="badge bg-danger">Dead</span>
+          {% else %}<span class="text-muted">&mdash;</span>
+          {% endif %}
+        </td>
+        <td>{{ cow.get_sire_type_display }}</td>
+        <td>{{ cow.registration_number }}</td>
+        <td>
+          <div class="btn-group">
+            <a href="{% url 'view_cattle' cow.id %}" class="btn btn-sm btn-outline-dark">View</a>
+            <a href="{% url 'edit_cattle' cow.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+            <ul class="dropdown-menu">
+              {% if cow.status != 'sold' %}
+              <li><a class="dropdown-item" href="{% url 'mark_cattle_sold' cow.id %}">Mark as Sold</a></li>
+              {% endif %}
+              {% if cow.status != 'dead' %}
+              <li><a class="dropdown-item" href="{% url 'mark_cattle_dead' cow.id %}">Mark as Dead</a></li>
+              {% endif %}
+              <li>
+                <a href="#" onclick="event.preventDefault();" class="dropdown-item text-danger"
+                   data-bs-toggle="modal" data-bs-target="#deleteModal"
+                   data-id="{{ cow.id }}" data-ear-tag="{{ cow.ear_tag }}"
+                   data-url="{% url 'delete_cattle' cow.id %}">🗑 Delete</a>
+              </li>
+            </ul>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

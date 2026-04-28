@@ -1,0 +1,15 @@
+<div class="bg-white rounded-2xl shadow p-4 relative">
+  <button class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onclick="toggleEdit('weights')">✏️</button>
+  <h3 class="text-lg font-medium mb-3">Recent Weights</h3>
+  {% if cattle.weight_logs.exists %}
+    <ul class="space-y-1">
+      {% with recent_weights=cattle.weight_logs.all|dictsortreversed:"date" %}
+        {% for log in recent_weights|slice:":5" %}
+          <li><strong>{{ log.date|date:'M d, Y' }}:</strong> {{ log.weight }} lbs</li>
+        {% endfor %}
+      {% endwith %}
+    </ul>
+  {% else %}
+    <p class="text-gray-500">No weight entries recorded.</p>
+  {% endif %}
+</div>

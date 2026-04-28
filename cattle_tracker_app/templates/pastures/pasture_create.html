@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Pasture{% endblock %}
+
+{% block extra_head %}
+  {# --- Local Leaflet core (must load FIRST) --- #}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+
+  {# --- Local Leaflet.Draw (AFTER leaflet.js) --- #}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet-draw/leaflet.draw.css' %}">
+  <script src="{% static 'vendor/leaflet-draw/leaflet.draw.js' %}"></script>
+
+  <style>
+    #pasture-map {
+      height: 60vh;
+      min-height: 420px;
+      border-radius: 0.75rem;
+    }
+  </style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-900">Add Pasture</h1>
+      <p class="mt-1 text-sm text-gray-500">
+        Create a new pasture, fill in the details, and draw its boundary on the map.
+      </p>
+    </div>
+    <a href="{% url 'pasture_list' %}"
+       class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+      ⬅ Back to Pastures
+    </a>
+  </div>
+
+  {% if not form %}
+    <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4">
+      <p><strong>Template error:</strong> No <code>form</code> was passed to this template.</p>
+      <p>Make sure your view calls <code>render(..., {"form": form})</code>.</p>
+    </div>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Left card: pasture form fields -->
+      <div class="bg-white shadow rounded-lg p-6 space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Pasture Details</h2>
+
+        {% if form %}
+          {% if form.non_field_errors %}
+            <div class="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          {# Render ALL fields. Treat boundary specially. #}
+          {% for field in form %}
+            {% if field.name == "boundary" or field.is_hidden %}
+              {# hide it; map/JS will handle it #}
+              {{ field.as_hidden }}
+            {% else %}
+              <div>
+                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                  {{ field.label }}
+                  {% if field.field.required %}
+                    <span class="text-red-500">*</span>
+                  {% endif %}
+                </label>
+                <div class="mt-1">
+                  {{ field }}
+                </div>
+                {% if field.help_text %}
+                  <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
+                {% endif %}
+                {% for error in field.errors %}
+                  <p class="mt-1 text-xs text-red-600">{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <p class="text-sm text-gray-500">
+            No form instance available. Check the view context.
+          </p>
+        {% endif %}
+      </div>
+
+      <!-- Right card: map -->
+      <div class="bg-white shadow rounded-lg p-6 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900">Pasture Boundary</h2>
+        </div>
+        <p class="text-sm text-gray-500">
+          Use the polygon tool to draw the pasture boundary. You can move points, edit the shape,
+          or delete and redraw as needed. The geometry will be saved with this pasture.
+        </p>
+
+        <div id="pasture-map" class="mt-3"></div>
+
+        <p class="mt-2 text-xs text-gray-400">
+          Tip: Click the polygon icon, click around the fence line, then click the first point or double-click to finish.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Submit -->
+    <div class="mt-6 flex justify-end">
+      <button type="submit"
+              class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+        💾 Save Pasture
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const mapEl = document.getElementById("pasture-map");
+    if (!mapEl) {
+      console.warn("[PastureCreate] Map element not found.");
+      return;
+    }
+    if (typeof L === "undefined") {
+      console.warn("[PastureCreate] Leaflet is not loaded. Check your static paths and extra_head block.");
+      return;
+    }
+
+    // Find the boundary input in a robust way
+    let boundaryInput = document.getElementById("id_boundary");
+    if (!boundaryInput) {
+      boundaryInput = document.querySelector("input[name$='boundary']");
+    }
+
+    if (!boundaryInput) {
+      console.warn("[PastureCreate] No boundary input found (id_boundary or name$='boundary').");
+    }
+
+    // Adjust this to your ranch center if you want
+    const defaultCenter = [34.0, -96.8];
+    const defaultZoom = 15;
+
+    const map = L.map(mapEl).setView(defaultCenter, defaultZoom);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    const drawControl = new L.Control.Draw({
+      edit: {
+        featureGroup: drawnItems,
+        remove: true
+      },
+      draw: {
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          showLength: true
+        },
+        polyline: false,
+        rectangle: false,
+        circle: false,
+        marker: false,
+        circlemarker: false
+      }
+    });
+
+    map.addControl(drawControl);
+
+    function syncBoundaryField() {
+      if (!boundaryInput) return;
+      const geojson = drawnItems.toGeoJSON();
+
+      if (geojson.features && geojson.features.length > 0) {
+        const geom = geojson.features[0].geometry;
+        try {
+          boundaryInput.value = JSON.stringify(geom);
+        } catch (err) {
+          console.warn("[PastureCreate] Failed to stringify geometry:", err);
+        }
+      } else {
+        boundaryInput.value = "";
+      }
+    }
+
+    // If there is already a boundary (e.g. form errors), re-draw it
+    if (boundaryInput && boundaryInput.value) {
+      try {
+        const geom = JSON.parse(boundaryInput.value);
+        const layerGroup = L.geoJSON(geom);
+        layerGroup.eachLayer(layer => drawnItems.addLayer(layer));
+        if (drawnItems.getLayers().length > 0) {
+          map.fitBounds(drawnItems.getBounds(), { padding: [20, 20] });
+        }
+      } catch (err) {
+        console.warn("[PastureCreate] Failed to parse existing boundary JSON:", err);
+      }
+    }
+
+    map.on(L.Draw.Event.CREATED, function (event) {
+      drawnItems.clearLayers();
+      drawnItems.addLayer(event.layer);
+      syncBoundaryField();
+    });
+
+    map.on(L.Draw.Event.EDITED, function () {
+      syncBoundaryField();
+    });
+
+    map.on(L.Draw.Event.DELETED, function () {
+      syncBoundaryField();
+    });
+  });
+</script>
+{% endblock extra_js %}

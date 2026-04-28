@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Turnout Group: {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Top bar: back + edit -->
+  <div class="mb-4 flex items-center justify-between">
+    <a href="{% url 'turnoutgroup_list' %}" class="text-sm text-green-700 hover:underline">← Back to Turnout Groups</a>
+    <a href="{% url 'turnoutgroup_edit' group.pk %}" class="px-3 py-2 rounded-lg bg-green-600 text-white shadow hover:bg-green-700">Edit Group</a>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 shadow rounded-2xl p-6">
+    <!-- Header -->
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold">{{ group.name }}</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+          Turn-in: {{ group.turn_in_date|date:"Y-m-d" }}
+          <span class="mx-2 text-gray-400">|</span>
+          Turn-out: {{ group.turn_out_date|date:"Y-m-d"|default:"—" }}
+        </p>
+      </div>
+      <div class="text-sm text-gray-600 dark:text-gray-300 text-right">
+        <div>Bulls: {{ group.bulls.count }}</div>
+        <div>Cows/Heifers: {{ group.cows.count }}</div>
+      </div>
+    </div>
+
+    <!-- Animals -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <!-- Bulls -->
+      <div>
+        <h2 class="font-semibold mb-2">Bulls</h2>
+        {% if group.bulls.all %}
+          <ul class="space-y-1">
+            {% for b in group.bulls.all %}
+              <li class="px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/30">
+                <span class="font-medium">{{ b.ear_tag|default:b }}</span>
+                {% if b.owner %}
+                  <span class="text-xs text-gray-500"> ({{ b.owner }})</span>
+                {% endif %}
+              </li>
+            {% empty %}
+              <li class="text-gray-500">None</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500">None</p>
+        {% endif %}
+      </div>
+
+      <!-- Cows / Heifers -->
+      <div>
+        <h2 class="font-semibold mb-2">Cows / Heifers</h2>
+        {% if group.cows.all %}
+          <ul class="space-y-1">
+            {% for c in group.cows.all %}
+              <li class="px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/30">
+                <span class="font-medium">{{ c.ear_tag|default:c }}</span>
+                {% if c.owner %}
+                  <span class="text-xs text-gray-500"> ({{ c.owner }})</span>
+                {% endif %}
+              </li>
+            {% empty %}
+              <li class="text-gray-500">None</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500">None</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-8 flex items-center gap-3">
+      <a href="{% url 'turnoutgroup_edit' group.pk %}" class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium shadow">Edit Group</a>
+      <a href="{% url 'turnoutgroup_list' %}" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900">Back to List</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

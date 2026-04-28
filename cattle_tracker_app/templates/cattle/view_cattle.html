@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto p-6">
+  <h2 class="mb-6 text-2xl font-semibold">
+    Cattle Profile – <span id="static-ear-tag-heading">{{ cattle.ear_tag }}</span>
+  </h2>
+
+  <!-- Full Cattle Detail Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+  {% include "cattle/_profile_card.html" %}
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    {% include "cattle/_breeding_card.html" %}
+    {% include "cattle/_calves_card.html" %}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    {% include "cattle/_health_card.html" %}
+    {% include "cattle/_weights_card.html" %}
+
+    <!-- Inline Add Weight Log -->
+    <div class="bg-white p-4 shadow rounded">
+      <h3 class="text-lg font-semibold mb-2">Add Weight Log</h3>
+      <form id="inline-weight-log-form">
+        {% csrf_token %}
+        <div class="flex gap-2 items-center">
+          <input type="number" name="weight" step="0.1" placeholder="Weight (lbs)" class="border p-2 rounded w-32">
+          <input type="date" name="date" class="border p-2 rounded">
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">➕ Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  {# --- Quick Add Health Record (hidden) --- #}
+  {% comment %}
+  {% include "health/_quick_add_health.html" with cattle=cattle today=now %}
+  {% endcomment %}
+  
+  {% include "cattle/_alerts_card.html" %}
+
+  {% if leased_bull_records %}
+    {% include "cattle/_leased_bulls_card.html" %}
+  {% endif %}
+
+  {% if cattle.breedingrecord_set.exists %}
+    {% include "cattle/_breeding_history_card.html" %}
+  {% endif %}
+</div>
+
+<!-- Image Modal -->
+<div id="image-modal" class="fixed inset-0 z-50 bg-black bg-opacity-80 hidden items-center justify-center">
+  <div class="relative max-w-3xl w-full">
+    <img id="modal-image" src="" alt="Enlarged" class="mx-auto max-h-[90vh] rounded shadow-lg">
+    <button onclick="closeImageModal()" class="absolute top-2 right-2 text-white text-2xl">&times;</button>
+  </div>
+</div>
+
+<script>
+let editing = false; // keep track of edit state between swaps
+
+// --- CSRF helper ---
+function getCSRFToken() {
+  const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  if (el) return el.value;
+  const m = document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+
+// Only visual (no event bindings; delegation handles events)
+function bindProfileCard() {
+  const displays = document.querySelectorAll(".field-display");
+  const inputs = document.querySelectorAll(".field-input");
+  const imageSection = document.getElementById("image-edit-section");
+  const editBtn = document.querySelector(".edit-btn");
+
+  inputs.forEach(input => input.classList.toggle("hidden", !editing));
+  displays.forEach(d => d.classList.toggle("hidden", editing));
+  if (imageSection) imageSection.classList.toggle("hidden", !editing);
+  if (editBtn) editBtn.textContent = editing ? "🔒" : "✏️";
+}
+
+// NEW: allow caller to request exiting edit mode after refresh
+function refreshCattleCard(pk, { exitEdit = false } = {}) {
+  fetch(`/cattle/${pk}/card/`)
+    .then(res => res.text())
+    .then(html => {
+      const host = document.getElementById("cattle-card");
+      host.outerHTML = html;                  // replace the node
+      if (exitEdit) editing = false;          // <-- auto-exit edit mode when asked
+      bindProfileCard();                      // restore visibility & button state
+    })
+    .catch(err => console.error("Partial reload failed:", err));
+}
+
+function toggleAllEdit() {
+  editing = !editing;
+  bindProfileCard();
+}
+
+// --- Image upload/delete (unchanged) ---
+function autoSaveImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('csrfmiddlewaretoken', getCSRFToken());
+
+  fetch("{% url 'update_cattle_field' cattle.id %}", { method: "POST", body: formData })
+    .then(res => { if (!res.ok) throw new Error('Upload failed'); return res.json(); })
+    .then(() => refreshCattleCard({{ cattle.id }}, { exitEdit: true }))   // exit edit after save
+    .catch(() => alert("Image upload failed"));
+}
+
+function deleteImage() {
+  fetch("{% url 'update_cattle_field' cattle.id %}", {
+    method: "POST",
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': getCSRFToken()
+    },
+    body: new URLSearchParams({ delete_image: '1' }).toString()
+  })
+  .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+  .then(() => refreshCattleCard({{ cattle.id }}, { exitEdit: true }))     // exit edit after delete
+  .catch(() => alert("Failed to delete image"));
+}
+
+// --- Delegated autosave that exits edit mode on success ---
+async function postFormField(url, name, value) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRFToken": getCSRFToken(),
+      "X-Requested-With": "XMLHttpRequest"
+    },
+    body: new URLSearchParams({ [name]: value }).toString()
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Save failed (${res.status})`);
+  }
+  return res.json().catch(() => ({ status: "success" }));
+}
+
+function saveFieldEl(el) {
+  const name = el.name;
+  let value = el.value;
+  if (!name) return Promise.resolve();
+  if (el.type === "checkbox") value = el.checked ? "1" : "0";
+  return postFormField("{% url 'update_cattle_field' cattle.id %}", name, value)
+    .then(j => {
+      if (j.status !== "success") throw new Error("Save failed");
+      // After a successful save, refresh and exit edit mode so the UI “snaps” back
+      return refreshCattleCard({{ cattle.id }}, { exitEdit: true });
+    });
+}
+
+// Save on change for any .field-input (delegated; survives swaps)
+document.addEventListener("change", (e) => {
+  const target = e.target.closest(".field-input");
+  if (!target) return;
+  saveFieldEl(target).catch(err => alert(err.message));
+});
+
+// Optional: save on Enter for text inputs
+document.addEventListener("keydown", (e) => {
+  const target = e.target.closest('.field-input');
+  if (!target) return;
+  if (e.key === "Enter" && target.tagName === "INPUT" && target.type !== "date") {
+    e.preventDefault();
+    saveFieldEl(target).catch(err => alert(err.message));
+  }
+});
+
+// Inline weight log: refresh but keep current edit state (no exitEdit here)
+const weightForm = document.getElementById("inline-weight-log-form");
+if (weightForm) {
+  weightForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const formData = new URLSearchParams(new FormData(weightForm));
+    fetch("{% url 'add_weight_log' cattle.id %}", {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: formData.toString()
+    }).then(res => {
+      if (res.ok) {
+        refreshCattleCard({{ cattle.id }}); // keep edit state as-is
+      } else {
+        res.text().then(t => alert(t || "Failed to add weight log"));
+      }
+    });
+  });
+}
+
+// Modal helpers (unchanged)
+function openImageModal(src) { /* ... as you have ... */ }
+function closeImageModal() { /* ... as you have ... */ }
+
+// Delegated edit toggle (survives swaps)
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest('.edit-btn[data-action="toggle-edit"]');
+  if (!btn) return;
+  e.preventDefault();
+  toggleAllEdit();
+});
+
+document.addEventListener("DOMContentLoaded", bindProfileCard);
+</script>
+
+
+{% endblock %}

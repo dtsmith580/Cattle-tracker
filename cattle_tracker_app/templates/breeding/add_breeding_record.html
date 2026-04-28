@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-3">
+  <h2 class="mb-4">🐮 Breeding Records</h2>
+
+  <!-- Breeding Form -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+      {{ form.instance.pk|yesno:"✏️ Edit Breeding Record,➕ New Breeding Record" }}
+    </div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-4">{{ form.cow.label_tag }}{{ form.cow }}</div>
+          <div class="col-md-4">{{ form.breeding_date.label_tag }}{{ form.breeding_date }}</div>
+          <div class="col-md-4">{{ form.method.label_tag }}{{ form.method }}</div>
+          <div class="col-md-4 d-none" id="bullField">{{ form.bull.label_tag }}{{ form.bull }}</div>
+          <div class="col-md-4 d-none" id="herdSireField">{{ form.herd_sire.label_tag }}{{ form.herd_sire }}</div>
+          <div class="col-md-4 d-none" id="leasedWrapper">{{ form.is_leased.label_tag }}{{ form.is_leased }}</div>
+        </div>
+        <button type="submit" class="btn btn-success mt-3">💾 Save</button>
+        <a href="{% url 'breeding_admin' %}" class="btn btn-outline-secondary mt-3">Cancel</a>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table of Recent Records -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>📋 Recent Breeding Records</span>
+      <div class="d-none d-md-block">
+        <button class="btn btn-sm btn-outline-primary" onclick="window.print()">🖨 Print</button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Cow</th>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Sire</th>
+            <th>Cleanup</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in breeding_records %}
+          <tr>
+            <td>{{ record.cow.ear_tag }}</td>
+            <td>{{ record.breeding_date }}</td>
+            <td>{{ record.get_method_display }}</td>
+            <td>
+              {% if record.method == 'ai' and record.herd_sire %}
+                {{ record.herd_sire.name }} (AI)
+              {% elif record.bull %}
+                {{ record.bull.ear_tag|default_if_none:record.bull }} {% if record.is_leased %}(Leased){% endif %} (Bull)
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              {% if record.cleanup_method == 'ai' and record.cleanup_herd_sire %}
+                {{ record.cleanup_herd_sire.name }} (AI)
+              {% elif record.cleanup_method == 'natural' and record.cleanup_sire %}
+                {{ record.cleanup_sire.ear_tag }} (Bull)
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <a href="{% url 'edit_breeding_record' record.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'delete_breeding_record' record.id %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?')">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-muted text-center">No records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Required Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const methodSelect = document.querySelector("#id_method");
+    const herdSireField = document.querySelector("#herdSireField");
+    const bullField = document.querySelector("#bullField");
+    const leasedWrapper = document.querySelector("#leasedWrapper");
+    const leasedCheckbox = document.querySelector("#id_is_leased");
+    const bullFieldSelect = document.querySelector("#id_bull");
+
+    function toggleSireFields() {
+      const method = methodSelect.value;
+      if (method === "ai") {
+        herdSireField.classList.remove("d-none");
+        bullField.classList.add("d-none");
+        leasedWrapper.classList.add("d-none");
+      } else if (method === "natural") {
+        herdSireField.classList.add("d-none");
+        bullField.classList.remove("d-none");
+        leasedWrapper.classList.remove("d-none");
+        filterBulls();
+      } else {
+        herdSireField.classList.add("d-none");
+        bullField.classList.add("d-none");
+        leasedWrapper.classList.add("d-none");
+      }
+    }
+
+    function filterBulls() {
+      if (!bullFieldSelect) return;
+
+      const showLeasedOnly = leasedCheckbox.checked;
+
+      for (const option of bullFieldSelect.options) {
+        const isLeased = option.text.includes("(Leased)");
+        option.hidden = showLeasedOnly ? !isLeased : false;
+      }
+    }
+
+    if (methodSelect) {
+      methodSelect.addEventListener("change", toggleSireFields);
+      toggleSireFields();
+    }
+
+    if (leasedCheckbox) {
+      leasedCheckbox.addEventListener("change", filterBulls);
+    }
+
+    if (window.jQuery && jQuery.fn.datepicker) {
+      $("#id_breeding_date").datepicker({ dateFormat: "yy-mm-dd" });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cattle List Export</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h2 { text-align: center; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+    th { background-color: #eee; }
+    .print-note { text-align: center; font-size: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>🐮 Cattle List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Ear Tag</th>
+        <th>Owner</th>
+        <th>Type</th>
+        <th>Sex</th>
+        <th>Date of Birth</th>
+        <th>Status</th>
+        <th>Latest Weight</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cattle in cattle_list %}
+      <tr>
+        <td>{{ cattle.ear_tag }}</td>
+        <td>{{ cattle.owner }}</td>
+        <td>{{ cattle.animal_type }}</td>
+        <td>{{ cattle.sex }}</td>
+        <td>{{ cattle.dob }}</td>
+        <td>{{ cattle.status }}</td>
+        <td>{{ cattle.latest_weight }} lbs</td>
+        <td>{{ cattle.location }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if print_mode %}
+    <script>
+      window.onload = function () { window.print(); };
+    </script>
+  {% endif %}
+</body>
+</html>

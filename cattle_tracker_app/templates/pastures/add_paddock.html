@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<h1 class="mb-4">➕ Add New Paddock in {{ pasture.name }}</h1>
+
+<div id="map" style="height: 500px; background-color: #e0e0e0; margin-bottom: 30px;"></div>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="hidden" name="boundary" id="boundary-field">
+  <button type="submit" class="btn btn-primary">Save New Paddock</button>
+  <a href="{% url 'pasture_detail' pasture.id %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% if not center_lat or not center_lng %}
+<p class="alert alert-warning mt-3">Warning: This map uses a default location. Please check your pasture's coordinates.</p>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Use defaults if context vars are missing
+  let lat = 35.5;
+  let lng = -97.5;
+  try {
+    lat = parseFloat("{{ center_lat|default:35.5 }}");
+    lng = parseFloat("{{ center_lng|default:-97.5 }}");
+    if (isNaN(lat)) lat = 35.5;
+    if (isNaN(lng)) lng = -97.5;
+  } catch (e) {
+    lat = 35.5; lng = -97.5;
+  }
+
+  const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  });
+
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles © Esri'
+  });
+
+  const map = L.map('map', {
+    layers: [satellite]
+  }).setView([lat, lng], 17);
+
+  var baseMaps = {
+    "Streets": streets,
+    "Satellite": satellite
+  };
+
+  L.control.layers(baseMaps).addTo(map);
+
+  var drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  const drawControl = new L.Control.Draw({
+    edit: false,
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        shapeOptions: { color: '#97009c' }
+      },
+      polyline: false,
+      rectangle: false,
+      circle: false,
+      marker: false,
+      circlemarker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  {% if pasture.boundary %}
+    const pastureBoundary = {{ pasture.boundary|safe }};
+    const pastureLayer = L.geoJSON(pastureBoundary, {
+      style: { color: '#0000FF', dashArray: '8,8', weight: 2, opacity: 0.5 }
+    }).addTo(map);
+    map.fitBounds(L.geoJSON(pastureBoundary).getBounds());
+  {% endif %}
+
+  {% for paddock in paddocks %}
+  {% if paddock.boundary %}
+    { // isolate scope for each
+      let paddockBoundary = {{ paddock.boundary|safe }};
+      L.geoJSON(paddockBoundary, {
+        style: { color: '#AAAAAA', weight: 1, opacity: 0.7, fillOpacity: 0.2 }
+      }).addTo(map);
+    }
+  {% endif %}
+{% endfor %}
+
+
+  map.on('draw:created', function (e) {
+    const layer = e.layer;
+    drawnItems.clearLayers();
+    drawnItems.addLayer(layer);
+
+    const drawnGeoJSON = layer.toGeoJSON();
+    document.getElementById('boundary-field').value = JSON.stringify(drawnGeoJSON.geometry);
+
+    // Auto-calculate acreage
+    const areaSqMeters = turf.area(drawnGeoJSON);
+    const acres = (areaSqMeters * 0.000247105).toFixed(2);
+    const acresInput = document.querySelector('input[name="acres"]');
+    if (acresInput) {
+      acresInput.value = acres;
+    }
+  });
+});
+</script>
+{% endblock %}

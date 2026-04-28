@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 bg-gray-100 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100">
+  <h1 class="text-3xl font-bold mb-6">Dashboard</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <!-- Total Cattle Card (snapshot-based MoM) -->
+<div class="rounded-2xl shadow-md p-5 bg-white dark:bg-gray-800
+            border-l-4
+            {% if total_cattle_prev %}
+              {% if delta > 0 %}border-green-500{% elif delta < 0 %}border-red-500{% else %}border-gray-500{% endif %}
+            {% else %}
+              border-gray-500
+            {% endif %}">
+  <p class="text-sm text-gray-500 dark:text-gray-300">Total Cattle</p>
+  <p class="text-4xl font-bold">{{ total_cattle }}</p>
+
+  <p class="text-sm
+            {% if delta > 0 %}text-green-600 dark:text-green-400
+            {% elif delta < 0 %}text-red-600 dark:text-red-400
+            {% else %}text-gray-500 dark:text-gray-300{% endif %}">
+    {% if total_cattle_prev %}
+      {% if delta > 0 %}
+        <i class="fas fa-arrow-up"></i>
+        +{{ delta }} ({{ percent|floatformat:1 }}%) vs last month ({{ total_cattle_prev }})
+      {% elif delta < 0 %}
+        <i class="fas fa-arrow-down"></i>
+        {{ delta|stringformat:"s"|slice:"1:" }} ({{ percent|floatformat:1 }}%) vs last month ({{ total_cattle_prev }})
+      {% else %}
+        No change vs last month ({{ total_cattle_prev }})
+      {% endif %}
+    {% else %}
+      — no baseline last month
+    {% endif %}
+  </p>
+</div>
+
+    <!-- Breeding Status Card -->
+    <div class="rounded-2xl shadow-md p-5 bg-white dark:bg-gray-800 border-l-4 border-yellow-500">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Breeding Status</p>
+      <p class="text-4xl font-bold">{{ breeding_count }}</p>
+      <p class="text-sm text-yellow-600 dark:text-yellow-400">↑ {{ breeding_delta|default:0|floatformat:1 }}% pregnant cows</p>
+    </div>
+
+    <!-- Health Alerts Card -->
+    <div class="rounded-2xl shadow-md p-5 bg-white dark:bg-gray-800 border-l-4 border-red-500">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Health Alerts</p>
+      <p class="text-4xl font-bold">{{ health_alerts_count }}</p>
+      <p class="text-sm text-red-600 dark:text-red-400">↓ {{ alert_delta|default:0|floatformat:1 }} urgent need attention</p>
+    </div>
+
+    <!-- Total Pasture Acres Card -->
+    <div class="rounded-2xl shadow-md p-5 bg-white dark:bg-gray-800 border-l-4
+            {% if pasture_delta > 0 %}border-green-500
+            {% elif pasture_delta < 0 %}border-red-500
+            {% else %}border-gray-500{% endif %}">
+       <p class="text-sm text-gray-500 dark:text-gray-300">Total Pasture Acres</p>
+       <p id="total-pasture-acres-value" class="text-4xl font-bold">{{ total_pasture_acres }} acres</p>
+
+       <p class="text-sm
+        {% if pasture_delta > 0 %}text-green-600 dark:text-green-400
+        {% elif pasture_delta < 0 %}text-red-600 dark:text-red-400
+        {% else %}text-gray-500 dark:text-gray-300{% endif %}">
+    {% if prev_month_pasture_acres %}
+      {% if pasture_delta > 0 %}
+        <i class="fas fa-arrow-up"></i> +{{ pasture_delta|floatformat:1 }} ({{ pasture_percent|floatformat:1 }}%)
+      {% elif pasture_delta < 0 %}
+        <i class="fas fa-arrow-down"></i> {{ pasture_delta|stringformat:"s"|slice:"1:"|floatformat:1 }}
+      {% else %}
+        No change from last month
+      {% endif %}
+    {% else %}
+      No historical data
+    {% endif %}
+       </p>
+    </div>
+</div>
+
+  <!-- Map & Weight Tracking -->
+  <div class="grid grid-cols-1 gap-6 mb-8 w-full">
+  
+  <!-- Map Card -->
+  <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-md relative ">
+    <h2 class="text-xl font-semibold mb-3">Pasture Management</h2>
+    <div id="pasture-map" class="w-full h-64 rounded-md"></div>
+
+    {# Embed ranch default center (from logged-in user's ranch mailing address) #}
+    {# In your view, pass: ranch_center = {"lat": ..., "lng": ..., "zoom": 12} #}
+    {% if ranch_center %}
+      {{ ranch_center|json_script:"ranch-center" }}
+    {% endif %}
+  </div>
+  
+  <!-- Weight History Card -->
+  <div class="bg-white dark:bg-gray-800 rounded-2xl px-4 shadow-md">
+  <div>
+    <canvas id="weight-sparkline" class="w-full h-64"></canvas>
+  </div>
+  <div class="mb-2 font-semibold text-center text-gray-800 dark:text-gray-100 text-sm">Recent Weight Logs</div>
+  
+  <table class="table-fixed w-full text-xs sm:text-sm text-left border-collapse border-spacing-0">
+    <tbody>
+    {% if recent_weight_logs %}
+      {% for entry in recent_weight_logs %}
+      <tr class="text-xs leading-none">
+        <td class="w-1/4 p-0 leading-none whitespace-nowrap font-mono">#{{ entry.log.cattle.ear_tag }}</td>
+        <td class="w-1/4 p-0 leading-none whitespace-nowrap text-center font-semibold">{{ entry.log.weight|floatformat:1 }} lbs</td>
+        <td class="w-1/4 p-0 leading-none whitespace-nowrap text-center">
+          {% if entry.percent_change is not None %}
+            {% if entry.percent_change > 0 %}
+              <span class="text-green-600 dark:text-green-400 flex items-center justify-center"><i class="fas fa-arrow-up"></i>&nbsp;+{{ entry.percent_change|floatformat:1 }}%</span>
+            {% elif entry.percent_change < 0 %}
+              <span class="text-red-600 dark:text-red-400 flex items-center justify-center"><i class="fas fa-arrow-down"></i>&nbsp;{{ entry.percent_change|floatformat:1 }}%</span>
+            {% else %}
+              <span class="text-gray-500 dark:text-gray-300">0%</span>
+            {% endif %}
+          {% else %}
+            <span class="text-gray-400 italic">New Entry</span>
+          {% endif %}
+        </td>
+        <td class="w-1/4 p-0 leading-none whitespace-nowrap text-right text-gray-500 dark:text-gray-400">{{ entry.log.date }}</td>
+      </tr>
+      {% endfor %}
+    {% else %}
+      <tr class="text-xs leading-none">
+        <td colspan="4" class="p-0 text-center text-gray-400 dark:text-gray-500">No recent weight logs available.</td>
+      </tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Cattle Inventory Cards -->
+  <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-md">
+    <h2 class="text-xl font-semibold mb-5">Cattle Inventory</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for cow in cattle_list %}
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900 shadow-sm">
+        <p class="text-sm text-green-600 dark:text-green-400 font-bold">#{{ cow.ear_tag }}</p>
+        <p class="text-lg font-semibold">{{ cow.name }}</p>
+        <p class="text-sm">DOB: {{ cow.dob }}</p>
+        <p class="text-sm">Weight: {% if cow.latest_weight %}
+             {{ cow.latest_weight }} lbs
+             {% else %}
+              — 
+             {% endif %} lbs
+      </p>
+        <p class="text-sm">Status:
+          {% if cow.health_status == 'alert' %}
+            <span class="px-2 py-0 rounded-full text-xs font-medium bg-red-200 text-red-800">Alert</span>
+          {% else %}
+            <span class="px-2 py-0 rounded-full text-xs font-medium bg-green-200 text-green-800">OK</span>
+          {% endif %}
+        </p>
+        <p class="text-sm">Location: {{ cow.location }}</p>
+        <div class="mt-2 flex justify-between">
+          <a href="#" class="text-green-600 dark:text-green-400 text-sm">Health Record</a>
+          <a href="{% url 'view_cattle' cow.id %}" class="text-blue-600 dark:text-blue-400 text-sm">View Details</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+{{ weight_daily|json_script:"weight-data" }}
+
+<!-- Deps -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+  /* Ensure the map can receive clicks even if other styles interfere */
+  #pasture-map { position: relative; z-index: 0; }
+  .leaflet-container { z-index: 1; }
+  .leaflet-pane, .leaflet-overlay-pane, .leaflet-map-pane, .leaflet-tooltip-pane { pointer-events: auto !important; }
+  .leaflet-interactive { pointer-events: auto !important; }
+
+  /* Tooltip styling */
+  .leaflet-tooltip.tooltip{
+    background: rgba(17,24,39,.9); color:#fff; border:0; border-radius:6px; padding:4px 8px;
+    font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  .leaflet-tooltip.tooltip:before{display:none;}
+</style>
+
+<script>
+(function (w, d) {
+  const Dashboard = {
+    cfg: {
+      pastureUrl: "/api/pastures/",
+      paddockUrl: "/api/paddocks/",
+      mapEl: "pasture-map",
+      ranchCenterEl: "ranch-center",
+      totalAcresEl: "total-pasture-acres-value",
+      weightDataEl: "weight-data",
+      weightCanvasEl: "weight-sparkline",
+      pastureClickPath: id => `/pastures/${id}/`,
+      paddockClickPath: id => `/pastures/paddock/${id}/`
+    },
+
+    async init(userCfg = {}) {
+      this.cfg = { ...this.cfg, ...userCfg };
+      await this._ensureLeaflet();
+      await this._initMap();
+      this._initChart();
+    },
+
+    _loadCSS(href){ return new Promise(r=>{ const l=d.createElement("link"); l.rel="stylesheet"; l.href=href; l.onload=r; d.head.appendChild(l); }); },
+    _loadScript(src){ return new Promise(r=>{ const s=d.createElement("script"); s.src=src; s.onload=r; d.body.appendChild(s); }); },
+    async _ensureLeaflet(){
+      if (w.L && L.map) return;
+      await this._loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+      await this._loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+    },
+
+    /* ------------------------------- Map -------------------------------- */
+    async _initMap() {
+      const mapEl = d.getElementById(this.cfg.mapEl);
+      if (!mapEl) return;
+
+      const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' });
+      const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Tiles © Esri' });
+
+      const map = L.map(this.cfg.mapEl, { center:[37.8,-96], zoom:4, layers:[streets] });
+      setTimeout(()=>map.invalidateSize(),0);
+      L.control.layers({ "Streets": streets, "Satellite": satellite }).addTo(map);
+
+      // Create panes with explicit z-index so polygons stay on top & clickable
+      const pasturePane = map.createPane('pasturePane'); pasturePane.style.zIndex = 610;
+      const paddockPane = map.createPane('paddockPane'); paddockPane.style.zIndex = 620;
+
+      // If some global CSS disables pointer events on SVG, force-enable
+      pasturePane.style.pointerEvents = 'auto';
+      paddockPane.style.pointerEvents  = 'auto';
+
+      function getColorById(id){ const s=String(id||''); let hash=0; for(let i=0;i<s.length;i++) hash=s.charCodeAt(i)+((hash<<5)-hash); const h=(hash%360+360)%360; return `hsl(${h},60%,60%)`; }
+      function getPaddockColor(str){ const s=String(str||''); let hash=0; for(let i=0;i<s.length;i++) hash=s.charCodeAt(i)+((hash<<5)-hash); const h=((hash+180)%360+360)%360; return `hsl(${h},80%,70%)`; }
+      const m2ToAcres = m2 => m2 * 0.00024710538146717;
+      const getId = f => f?.properties?.id ?? f?.id ?? f?.properties?.pk ?? f?.properties?.object_id ?? null;
+
+      function getAcresFromFeature(feature){
+        const apiAcres = Number(feature?.properties?.acres);
+        if (!isNaN(apiAcres) && apiAcres>0) return apiAcres;
+        try { return m2ToAcres(turf.area(feature)); } catch { return null; }
+      }
+
+      const centerOnFallback = () => {
+        const el = d.getElementById(Dashboard.cfg.ranchCenterEl);
+        if (el) { try { const rc = JSON.parse(el.textContent);
+          if (rc && typeof rc.lat==='number' && typeof rc.lng==='number'){ map.setView([rc.lat,rc.lng], rc.zoom||12); return true; }
+        } catch(e){ console.warn('Invalid ranch-center JSON:', e); } }
+        map.setView([37.8,-96],4); return false;
+      };
+
+      // Map-level diagnostic: tell us what's actually under the pointer
+      map.on('click', (e) => {
+        const elUnder = d.elementFromPoint(e.originalEvent.clientX, e.originalEvent.clientY);
+        console.debug('[Map click] elementFromPoint:', elUnder?.tagName, elUnder?.className);
+      });
+
+      // Fetch GeoJSON
+      let pastFC = { type:"FeatureCollection", features:[] };
+      let paddFC = { type:"FeatureCollection", features:[] };
+      try {
+        const [pastResp, paddResp] = await Promise.all([
+          fetch(Dashboard.cfg.pastureUrl, { credentials:"same-origin" }),
+          fetch(Dashboard.cfg.paddockUrl, { credentials:"same-origin" })
+        ]);
+        const [past, padd] = await Promise.all([pastResp.json(), paddResp.json()]);
+        const isFC = g => g && g.type==="FeatureCollection" && Array.isArray(g.features);
+        pastFC = isFC(past) ? past : pastFC;
+        paddFC = isFC(padd) ? padd : paddFC;
+      } catch (e) { console.error("Error loading GeoJSON:", e); centerOnFallback(); }
+
+      // Pastures
+      let totalPastureAcresComputed = 0;
+      const pastureLayer = L.geoJSON(pastFC, {
+        pane: 'pasturePane',
+        bubblingMouseEvents: true,
+        style: f => ({
+          color:'#333', weight:2,
+          fillColor: getColorById((f.properties?.id ?? f.properties?.name ?? '').toString()),
+          fillOpacity:0.5
+        }),
+        onEachFeature: (feature, layer) => {
+          const name  = feature.properties?.name || 'Pasture';
+          const acres = getAcresFromFeature(feature);
+          if (acres!=null && isFinite(acres)) totalPastureAcresComputed += acres;
+          const label = (acres!=null && isFinite(acres)) ? `${name} — ${acres.toFixed(1)} acres` : name;
+
+          layer.bindTooltip(label, { direction:"top", className:"tooltip" });
+
+          const go = (ev) => {
+            ev?.originalEvent?.preventDefault?.();
+            ev?.originalEvent?.stopPropagation?.();
+            const id = getId(feature);
+            console.debug('Pasture click:', { id, feature });
+            if (id) w.location.assign(Dashboard.cfg.pastureClickPath(id));
+          };
+          layer.on('click', go);
+          layer.on('touchstart', go);
+
+          layer.on('mouseover', ()=>{ layer.bringToFront(); layer.setStyle({ weight:4, fillOpacity:0.7 }); });
+          layer.on('mouseout',  ()=> layer.setStyle({ weight:2, fillOpacity:0.5 }) );
+          layer.on('add', ()=>{ if (layer._path) layer._path.style.cursor='pointer'; });
+        }
+      }).addTo(map);
+
+      // Paddocks
+      const paddockLayer = L.geoJSON(paddFC, {
+        pane: 'paddockPane',
+        bubblingMouseEvents: true,
+        style: f => ({ color:'#F59E0B', weight:1, dashArray:"4", fillOpacity:0.4, fillColor:getPaddockColor(f.properties?.name||"") }),
+        onEachFeature: (feature, layer) => {
+          const name  = feature.properties?.name || 'Paddock';
+          const acres = getAcresFromFeature(feature);
+          const label = (acres!=null && isFinite(acres)) ? `${name} — ${acres.toFixed(2)} acres` : name;
+
+          layer.bindTooltip(label, { direction:"auto", className:"tooltip" });
+
+          const go = (ev) => {
+            ev?.originalEvent?.preventDefault?.();
+            ev?.originalEvent?.stopPropagation?.();
+            const id = getId(feature);
+            console.debug('Paddock click:', { id, feature });
+            if (id) w.location.assign(Dashboard.cfg.paddockClickPath(id));
+          };
+          layer.on('click', go);
+          layer.on('touchstart', go);
+
+          layer.on('mouseover', ()=> layer.bringToFront() );
+          layer.on('add', ()=>{ if (layer._path) layer._path.style.cursor='pointer'; });
+        }
+      }).addTo(map);
+
+      // Fit bounds or center fallback
+      const allLayers = [...pastureLayer.getLayers(), ...paddockLayer.getLayers()];
+      if (allLayers.length){
+        const group = L.featureGroup(allLayers);
+        const b = group.getBounds();
+        if (b.isValid() && [b.getNorth(),b.getEast(),b.getSouth(),b.getWest()].every(Number.isFinite)) {
+          map.fitBounds(b.pad(0.05));
+        } else { centerOnFallback(); }
+      } else { centerOnFallback(); }
+
+      // Backfill total acres if server didn’t set it
+      const totalEl = d.getElementById(this.cfg.totalAcresEl);
+      if (totalEl){
+        const txt=(totalEl.textContent||'').trim();
+        if (!/\d/.test(txt) && totalPastureAcresComputed>0){
+          totalEl.textContent = `${totalPastureAcresComputed.toFixed(1)} acres`;
+        }
+      }
+    },
+
+    /* ------------------------------ Chart ------------------------------- */
+    _initChart() {
+      const raw = d.getElementById(this.cfg.weightDataEl);
+      const weightData = raw ? JSON.parse(raw.textContent || "[]") : [];
+
+      const labels = weightData.map(it => it.date ?? it.label ?? "");
+      const toNum = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+      const pickY  = o => toNum(o.avg_weight ?? o.avg ?? o.avg_weight__avg ?? o.value ?? o.weight ?? o.y);
+      const data   = weightData.map(pickY);
+
+      const canvas = d.getElementById(this.cfg.weightCanvasEl);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      if (Chart.getChart && Chart.getChart(canvas)) Chart.getChart(canvas).destroy();
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            tension: 0.3,
+            borderWidth: 2,
+            borderColor: 'rgba(75,192,192,1)',
+            pointRadius: 3,
+            pointBackgroundColor: 'white',
+            pointBorderColor: 'rgba(75,192,192,1)',
+            fill: false,
+            spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          parsing: false,
+          plugins: { legend: { display: false }, tooltip: { intersect: false, mode: 'index' } },
+          interaction: { intersect: false, mode: 'nearest' },
+          scales: {
+            x: { display: true, grid: { display:false }, ticks: { maxTicksLimit:7, autoSkip:true } },
+            y: { display: true, grid: { color:'rgba(0,0,0,0.1)', borderDash:[5,5] }, beginAtZero:false }
+          },
+          elements: { line: { cubicInterpolationMode:'default' } }
+        }
+      });
+    }
+  };
+
+  w.Dashboard = Dashboard;
+  d.addEventListener("DOMContentLoaded", () => Dashboard.init());
+})(window, document);
+</script>
+{% endblock %}
+

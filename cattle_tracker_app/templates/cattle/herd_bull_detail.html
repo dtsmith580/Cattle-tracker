@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Herd Bull • {{ hb.cattle.ear_tag|default:"Bull" }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl">
+  <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 flex gap-6 mb-6">
+    <div class="w-40 shrink-0">
+      {% if hb.cattle.image %}
+        <img src="{{ hb.cattle.image.url }}" class="rounded-lg w-40 h-40 object-cover border" alt="Bull {{ hb.cattle.ear_tag }}">
+      {% else %}
+        <div class="w-40 h-40 rounded-lg border flex items-center justify-center text-gray-400">No Image</div>
+      {% endif %}
+    </div>
+    <div class="flex-1">
+      <div class="flex justify-between">
+        <div>
+          <h2 class="text-xl font-semibold">{{ hb.cattle.ear_tag|default:"(no tag)" }}</h2>
+          <div class="text-sm text-gray-500">
+            Owner: {{ hb.cattle.owner.name }}{% if hb.cattle.registration_number %} • Reg: {{ hb.cattle.registration_number }}{% endif %}
+          </div>
+        </div>
+        <a href="{% url 'herd_bull_edit' hb.pk %}" class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700">Edit</a>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+        <div>Fertility: <span class="font-medium">{{ hb.fertility_status|default:"—" }}</span>{% if hb.fertility_test_date %} ({{ hb.fertility_test_date }}){% endif %}</div>
+        <div>Scrotal (cm): {{ hb.scrotal_circumference_cm|default:"—" }}</div>
+        <div>Frame Score: {{ hb.frame_score|default:"—" }}</div>
+        <div>Semen Collected: {{ hb.semen_collected|yesno:"Yes,No" }} ({{ hb.semen_straws_on_hand }} straws)</div>
+        <div>Storage: {{ hb.semen_storage_location|default:"—" }}</div>
+        <div>Calves sired: <span class="font-medium">{{ hb.total_calves_sired }}</span></div>
+        <div class="col-span-2">
+          {% if hb.epd_profile_url %}
+            <a class="text-green-600 underline" href="{{ hb.epd_profile_url }}" target="_blank" rel="noopener">EPD Profile</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if hb.notes %}
+        <div class="mt-4 text-sm"><span class="font-semibold">Notes:</span> {{ hb.notes }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <h3 class="text-lg font-semibold mb-2">Calves Sired</h3>
+  {% if offspring %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white dark:bg-gray-800 shadow rounded-lg">
+        <thead>
+          <tr class="text-left">
+            <th class="px-3 py-2">Ear Tag</th>
+            <th class="px-3 py-2">Owner</th>
+            <th class="px-3 py-2">DOB</th>
+            <th class="px-3 py-2">Sex</th>
+            <th class="px-3 py-2">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for calf in offspring %}
+            <tr class="border-t">
+              <td class="px-3 py-2">
+                <a class="underline" href="{% url 'cattle_detail' calf.pk %}">{{ calf.ear_tag|default:calf.pk }}</a>
+              </td>
+              <td class="px-3 py-2">{{ calf.owner.name }}</td>
+              <td class="px-3 py-2">{{ calf.dob|date:"Y-m-d"|default:"—" }}</td>
+              <td class="px-3 py-2">{{ calf.sex|default:calf.animal_type|default:"—" }}</td>
+              <td class="px-3 py-2">{{ calf.status }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-sm text-gray-500">No calves recorded yet for this bull.</div>
+  {% endif %}
+</div>
+{% endblock %}

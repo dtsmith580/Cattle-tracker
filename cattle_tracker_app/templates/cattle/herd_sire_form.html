@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Add Herd Sire</h1>
+
+<div class="bg-white shadow rounded-lg p-6 space-y-4 mx-auto w-full max-w-screen-sm">
+  <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    {% csrf_token %}
+
+    <div class="flex items-center space-x-4">
+      <label for="id_name" class="w-32 text-sm font-medium text-gray-700">Name</label>
+      <input type="text" name="name" id="id_name" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.name.value }}">
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <label for="id_semen_type" class="w-32 text-sm font-medium text-gray-700">Semen Type</label>
+      {{ form.semen_type }}
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <label for="id_cleanup_method" class="w-32 text-sm font-medium text-gray-700">Cleanup Method</label>
+      {{ form.cleanup_method }}
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <label for="id_profile_link" class="w-32 text-sm font-medium text-gray-700">Profile Link</label>
+      <input type="url" name="profile_link" id="id_profile_link" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.profile_link.value }}">
+    </div>
+
+    <div class="flex items-start space-x-4">
+      <label for="id_notes" class="w-32 text-sm font-medium text-gray-700 pt-2">Notes</label>
+      {{ form.notes }}
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <label for="id_image" class="w-32 text-sm font-medium text-gray-700">Image</label>
+      {{ form.image }}
+    </div>
+
+    <div class="pt-4">
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
+      <a href="{% url 'herd_sire_list' %}" class="ml-4 text-gray-600 hover:underline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% comment %} Reusable paginator partial. Expects: page_obj, is_paginated, request {% endcomment %}
+{% if is_paginated %}
+<nav class="mt-4 flex items-center justify-between" aria-label="Pagination">
+  <div class="flex-1">
+    <p class="text-sm text-gray-500">
+      Page <span class="font-medium">{{ page_obj.number }}</span> of <span class="font-medium">{{ page_obj.paginator.num_pages }}</span>
+      — showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+    </p>
+  </div>
+
+  <ul class="inline-flex items-center gap-1">
+    {% with q=request.GET.urlencode %}
+      {% if page_obj.has_previous %}
+        <li>
+          <a class="px-3 py-1 rounded border hover:bg-gray-50"
+             href="?{% if q %}{{ q|urlencode }}&{% endif %}page=1">First</a>
+        </li>
+        <li>
+          <a class="px-3 py-1 rounded border hover:bg-gray-50"
+             href="?{% if q %}{{ q|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Prev</a>
+        </li>
+      {% else %}
+        <li><span class="px-3 py-1 rounded border opacity-40 cursor-not-allowed">First</span></li>
+        <li><span class="px-3 py-1 rounded border opacity-40 cursor-not-allowed">Prev</span></li>
+      {% endif %}
+
+      {# numeric window around current page #}
+      {% for i in page_obj.paginator.page_range %}
+        {% if i >= page_obj.number|add:'-2' and i <= page_obj.number|add:'2' %}
+          {% if i == page_obj.number %}
+            <li><span class="px-3 py-1 rounded border font-semibold">{{ i }}</span></li>
+          {% else %}
+            <li>
+              <a class="px-3 py-1 rounded border hover:bg-gray-50"
+                 href="?{% if q %}{{ q|urlencode }}&{% endif %}page={{ i }}">{{ i }}</a>
+            </li>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <li>
+          <a class="px-3 py-1 rounded border hover:bg-gray-50"
+             href="?{% if q %}{{ q|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+        </li>
+        <li>
+          <a class="px-3 py-1 rounded border hover:bg-gray-50"
+             href="?{% if q %}{{ q|urlencode }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+        </li>
+      {% else %}
+        <li><span class="px-3 py-1 rounded border opacity-40 cursor-not-allowed">Next</span></li>
+        <li><span class="px-3 py-1 rounded border opacity-40 cursor-not-allowed">Last</span></li>
+      {% endif %}
+    {% endwith %}
+  </ul>
+</nav>
+{% endif %}

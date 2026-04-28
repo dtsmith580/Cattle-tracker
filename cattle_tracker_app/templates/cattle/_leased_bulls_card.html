@@ -1,0 +1,10 @@
+<div class="bg-white rounded-2xl shadow p-4 mb-6">
+  <h3 class="text-lg font-medium mb-3">Leased Bull Records</h3>
+  <ul class="space-y-2">
+    {% for record in leased_bull_records %}
+      <li>
+        <strong>{{ record.leased_bull.ear_tag }}</strong> – Used from {{ record.start_date }} to {{ record.end_date|default:"ongoing" }}
+      </li>
+    {% endfor %}
+  </ul>
+</div>

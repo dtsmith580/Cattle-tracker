@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Import Summary</h2>
+
+<p><strong>Imported:</strong> {{ imported }}</p>
+<p><strong>Failed:</strong> {{ failed }}</p>
+
+{% if errors %}
+  <h4>Errors:</h4>
+  <ul>
+    {% for error in errors %}
+      <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+<a href="{% url 'import_csv' %}" class="btn btn-primary">Back to Import</a>
+{% endblock %}

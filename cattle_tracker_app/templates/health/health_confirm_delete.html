@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Delete Health Record{% endblock %}
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+  <h1 class="text-xl font-semibold mb-4">Delete Health Record</h1>
+  <p class="mb-4">Are you sure you want to delete <strong>{{ record }}</strong>?</p>
+  <form method="post">{% csrf_token %}
+    <a href="{% url 'health_list' %}" class="px-3 py-2 rounded bg-gray-200">Cancel</a>
+    <button class="px-3 py-2 rounded bg-red-600 text-white">Delete</button>
+  </form>
+</div>
+{% endblock %}

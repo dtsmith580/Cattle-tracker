@@ -1,0 +1,55 @@
+<!-- cattle_tracker_app/forms/turnout_group_form.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Create Turnout Group</h2>
+  <hr>
+
+  <form method="post" class="mt-4">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="mb-3">
+      <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+      {{ form.name }}
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="{{ form.turn_in.id_for_label }}" class="form-label">{{ form.turn_in.label }}</label>
+        {{ form.turn_in }}
+      </div>
+      <div class="col-md-6 mb-3">
+        <label for="{{ form.turn_out.id_for_label }}" class="form-label">{{ form.turn_out.label }}</label>
+        {{ form.turn_out }}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="{{ form.bulls.id_for_label }}" class="form-label">{{ form.bulls.label }}</label>
+      {{ form.bulls }}
+      <div class="form-text">Select one or more bulls</div>
+    </div>
+
+    <div class="mb-3">
+      <label for="{{ form.cows.id_for_label }}" class="form-label">{{ form.cows.label }}</label>
+      {{ form.cows }}
+      <div class="form-text">Select one or more cows/heifers</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Group</button>
+    <a href="{% url 'cattle_list' %}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Wait for jQuery
+    $(function () {
+      $('select[multiple]').select2({
+        placeholder: "Select animals",
+        width: '100%'  // Optional: make it full width
+      });
+    });
+  });
+</script>
+{% endblock %}

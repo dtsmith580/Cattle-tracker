@@ -1,0 +1,134 @@
+<!--# breeding_admin.html
+# Version: Includes Add Breeding toggle, AJAX bull update, and dynamic method-based field display
+-->
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Breeding Records</h2>
+    <button class="btn btn-primary" id="toggleBreedingForm">➕ Add Breeding</button>
+  </div>
+
+  <!-- Breeding Form -->
+  <div id="breedingFormWrapper" class="card mb-4 d-none">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">{{ form.cow.label_tag }} {{ form.cow|add_class:"form-select" }}</div>
+          <div class="col-md-6">{{ form.breeding_date.label_tag }} {{ form.breeding_date|add_class:"form-control" }}</div>
+          <div class="col-md-4">{{ form.method.label_tag }} {{ form.method|add_class:"form-select" }}</div>
+          <div class="col-md-4 d-none" id="herdSireField">{{ form.herd_sire.label_tag }} {{ form.herd_sire|add_class:"form-select" }}</div>
+          <div class="col-md-4">{{ form.is_leased.label_tag }} {{ form.is_leased }}</div>
+          <div class="col-md-6 d-none" id="bullField">{{ form.bull.label_tag }} {{ form.bull|add_class:"form-select" }}</div>
+        </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-success">💾 Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Breeding Table -->
+  <div class="card">
+  <div class="card-body">
+    <div class="table-container">
+      <div class="d-flex justify-content-end mb-2">
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-primary export-btn" onclick="exportTable('csv')">Export CSV</button>
+          <button class="btn btn-sm btn-outline-success export-btn" onclick="exportTable('excel')">Export Excel</button>
+          <button class="btn btn-sm btn-outline-danger export-btn" onclick="exportTable('pdf')">Export PDF</button>
+          <button class="btn btn-sm btn-outline-secondary export-btn" onclick="exportTable('print')">Print</button>
+        </div>
+      </div>
+      <table class="table table-bordered table-sm w-100">
+        <thead>
+          <tr>
+            <th>Cow</th>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Bull</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in breeding_records %}
+          <tr>
+            <td>{{ record.cow }}</td>
+            <td>{{ record.breeding_date }}</td>
+            <td>{{ record.get_method_display }}</td>
+            <td>
+              {% if record.bull %}{{ record.bull }}{% elif record.herd_sire %}{{ record.herd_sire.name }}{% endif %}
+            </td>
+            <td>
+              <a href="{% url 'edit_breeding_record' record.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'delete_breeding_record' record.id %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const toggleBtn = document.getElementById("toggleBreedingForm");
+    const formWrapper = document.getElementById("breedingFormWrapper");
+    const leasedCheckbox = document.querySelector("input[name='is_leased']");
+    const bullSelect = document.querySelector("select[name='bull']");
+    const methodSelect = document.querySelector("select[name='method']");
+    const herdSireField = document.getElementById("herdSireField");
+    const bullField = document.getElementById("bullField");
+
+    toggleBtn.addEventListener("click", () => {
+      formWrapper.classList.toggle("d-none");
+    });
+
+    if (leasedCheckbox && bullSelect) {
+      leasedCheckbox.addEventListener("change", function() {
+        fetch(`/ajax/get-bull-options/?is_leased=${this.checked}`)
+          .then(res => res.json())
+          .then(data => {
+            bullSelect.innerHTML = "<option value=''>---------</option>";
+            data.bulls.forEach(([id, name]) => {
+              const option = document.createElement("option");
+              option.value = id;
+              option.textContent = name;
+              bullSelect.appendChild(option);
+            });
+          });
+      });
+    }
+
+    if (methodSelect) {
+      const updateFields = () => {
+        const selectedMethod = methodSelect.value;
+        if (selectedMethod === 'natural') {
+          bullField.classList.remove("d-none");
+          herdSireField.classList.add("d-none");
+        } else if (selectedMethod === 'ai') {
+          herdSireField.classList.remove("d-none");
+          bullField.classList.add("d-none");
+        } else {
+          herdSireField.classList.add("d-none");
+          bullField.classList.add("d-none");
+        }
+      };
+      methodSelect.addEventListener("change", updateFields);
+      updateFields(); // initial run
+    }
+  });
+  
+</script>
+<script src="{% static 'js/export-table.js' %}"></script>
+{% endblock %}
+

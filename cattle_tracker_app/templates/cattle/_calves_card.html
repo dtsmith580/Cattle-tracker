@@ -1,0 +1,18 @@
+<div class="bg-white rounded-2xl shadow p-4 relative">
+  <button class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onclick="toggleEdit('calves')">✏️</button>
+  <h3 class="text-lg font-medium mb-3">Calves</h3>
+  {% if cattle.dam_of.exists %}
+    <ul class="space-y-2">
+      {% for calf in cattle.dam_of.all %}
+        <li>
+          <a href="{% url 'view_cattle' calf.id %}" class="flex items-center text-blue-600 hover:underline">
+            {% if calf.sex == 'male' %}🐂{% elif calf.sex == 'female' %}🐄{% else %}🐮{% endif %}
+            <span class="ml-2">{{ calf.ear_tag }} – {{ calf.dob|date:'M d, Y' }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-gray-500">No calves recorded.</p>
+  {% endif %}
+</div>

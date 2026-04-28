@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+  {% if form.instance.pk %}Edit Turnout Group{% else %}Add Turnout Group{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6 flex items-center gap-3">
+    {% if form.instance.pk %}
+      <a href="{% url 'turnoutgroup_list' %}" class="text-sm text-green-700 hover:underline">← Back to Turnout Groups</a>
+    {% else %}
+      <a href="{% url 'turnoutgroup_list' %}" class="text-sm text-green-700 hover:underline">← Back to Turnout Groups</a>
+    {% endif %}
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 shadow rounded-2xl p-6">
+    {% if form.instance.pk %}
+      <h1 class="text-2xl font-semibold mb-1">Edit Turnout Group</h1>
+    {% else %}
+      <h1 class="text-2xl font-semibold mb-1">Create Turnout Group</h1>
+    {% endif %}
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+      Bulls: alive &amp; ≥16 months. Cows/Heifers: alive &amp; ≥14 months. Options are scoped to your allowed owners.
+      <br><span class="text-xs">Note: animals already in this group may appear even if they don’t meet current filters.</span>
+    </p>
+
+    {% if form.non_field_errors %}
+      <div class="mb-4 rounded-lg border border-red-300 bg-red-50 text-red-800 p-3">
+        {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="mb-5">
+        <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium mb-1">Group name:</label>
+        {{ form.name }}
+        {% if form.name.errors %}
+          <p class="mt-1 text-sm text-red-600">{% for e in form.name.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label for="{{ form.bulls.id_for_label }}" class="block text-sm font-medium mb-1">Bulls (alive, ≥16 months)</label>
+          {{ form.bulls }}
+          {% if form.bulls.errors %}
+            <p class="mt-1 text-sm text-red-600">{% for e in form.bulls.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+          {% endif %}
+          <div class="mt-1 text-xs text-gray-500" id="bulls-count">0 selected</div>
+        </div>
+
+        <div>
+          <label for="{{ form.cows.id_for_label }}" class="block text-sm font-medium mb-1">Cows / Heifers (alive, ≥14 months)</label>
+          {{ form.cows }}
+          {% if form.cows.errors %}
+            <p class="mt-1 text-sm text-red-600">{% for e in form.cows.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+          {% endif %}
+          <div class="mt-1 text-xs text-gray-500" id="cows-count">0 selected</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md-grid-cols-2 gap-6 mt-6">
+        <div>
+          <label for="{{ form.turn_in_date.id_for_label }}" class="block text-sm font-medium mb-1">Turn-in date</label>
+          {{ form.turn_in_date }}
+          {% if form.turn_in_date.errors %}
+            <p class="mt-1 text-sm text-red-600">{% for e in form.turn_in_date.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.turn_out_date.id_for_label }}" class="block text-sm font-medium mb-1">Turn-out date (optional)</label>
+          {{ form.turn_out_date }}
+          {% if form.turn_out_date.errors %}
+            <p class="mt-1 text-sm text-red-600">{% for e in form.turn_out_date.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mt-8 flex items-center gap-3">
+        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium shadow">
+          {% if form.instance.pk %}Save Changes{% else %}Save Turnout Group{% endif %}
+        </button>
+
+        {% if form.instance.pk %}
+          <a href="{% url 'turnoutgroup_list' %}" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900">
+            Cancel
+          </a>
+        {% else %}
+          <a href="{% url 'turnoutgroup_list' %}" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900">
+            Cancel
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Select2 (CDN) -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+
+
+<script>
+  (function () {
+    const bullsId = "{{ form.bulls.id_for_label }}";
+    const cowsId  = "{{ form.cows.id_for_label }}";
+
+    function initSelect2(id, placeholder) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const $el = $(el);
+
+      $el.select2({
+        width: '100%',
+        placeholder: placeholder,
+        allowClear: true,
+        closeOnSelect: false
+      });
+
+      // Show selected counts
+      const updateCount = () => {
+        const n = Array.from(el.options).filter(o => o.selected).length;
+        const targetId = (id === bullsId) ? "bulls-count" : "cows-count";
+        const t = document.getElementById(targetId);
+        if (t) t.textContent = n + (n === 1 ? " selected" : " selected");
+      };
+
+      $el.on('change', updateCount);
+      // Ensure Select2 reflects preselected items on edit
+      $el.trigger('change');
+      updateCount();
+    }
+
+    initSelect2(bullsId, "Search/select bulls…");
+    initSelect2(cowsId,  "Search/select cows…");
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block content %}
+
+
+<h2>Map Fields</h2>
+<form method="post" action="{% url 'import_csv_confirm' %}">
+<div style="overflow-x: auto; max-width: 1600px;">
+  <table class="table table-bordered" style="min-width: 800px;">
+  {% csrf_token %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>CSV Column</th>
+        <th>Map To Field</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for header in csv_headers %}
+      <tr>
+        <td>{{ header }}</td>
+        <td>
+          <select name="field_{{ forloop.counter0 }}" class="form-select">
+            <option value="">-- ignore --</option>
+            {% for field in model_fields %}
+              <option value="{{ field }}">{{ field }}</option>
+            {% endfor %}
+          </select>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </table>
+  </div>
+  <input type="hidden" name="header_count" value="{{ csv_headers|length }}">
+  <button type="submit" class="btn btn-success">Import</button>
+</form>
+
+<h3 class="mt-5">Preview</h3>
+<div style="overflow-x: auto; max-width: 1600px;">
+  <table class="table table-bordered" style="min-width: 800px;">
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      {% for h in csv_headers %}
+      <th>{{ h }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in preview %}
+    <tr>
+      {% for h in csv_headers %}
+      <td>{{ row|get_item:h }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</table>
+</div>
+{% endblock %}

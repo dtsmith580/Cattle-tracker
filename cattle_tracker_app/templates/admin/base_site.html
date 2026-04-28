@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+
+{# Option A: add to the top nav bar #}
+{% block nav-global %}
+  {{ block.super }}
+  <a class="button" href="{% url 'admin:cattle_tracker_app_todoboard_changelist' %}">📝 Project To-Do</a>
+{% endblock %}
+
+{# If your theme doesn't show nav-global, use branding instead:
+{% block branding %}
+  {{ block.super }}
+  <a class="button" href="{% url 'admin:cattle_tracker_app_todoboard_changelist' %}" style="margin-left:1rem;">
+    📝 Project To-Do
+  </a>
+{% endblock %}
+#}

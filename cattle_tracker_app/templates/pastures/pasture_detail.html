@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pasture {{ pasture.name|default:pasture.pk }}{% endblock %}
+
+{% block extra_head %}
+  <!-- Leaflet core -->
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+
+  <!-- Leaflet.Draw -->
+  <link rel="stylesheet" href="{% static 'vendor/leaflet-draw/leaflet.draw.css' %}">
+  <script src="{% static 'vendor/leaflet-draw/leaflet.draw.js' %}"></script>
+
+  <!-- Turf.js -->
+  <script src="{% static 'vendor/turf.min.js' %}"></script>
+
+  <!-- Shared map loader -->
+  <script src="{% static 'js/maploader.js' %}"></script>
+
+  <style>
+    #pasture-map { height: 60vh; min-height: 420px; border-radius: 0.75rem; }
+    .muted { color: #6b7280; }
+    .field-row label { font-weight: 600; }
+    /* Keep any Leaflet controls above Tailwind content */
+    .leaflet-control-container { z-index: 1000; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">
+      🌾 Pasture — {{ pasture.name|default:"(Unnamed)" }}
+    </h1>
+    <a class="underline text-blue-600" href="{% url 'pasture_list' %}">Back to Pastures</a>
+  </div>
+
+  <!-- Info + autosave fields -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="p-4 rounded-lg border">
+      <div class="field-row mb-2">
+        <label for="pasture-name">Name</label>
+        <input id="pasture-name" class="w-full border rounded px-2 py-1"
+               type="text" value="{{ pasture.name|default_if_none:'' }}"
+               data-field="name">
+      </div>
+      <p class="text-sm muted">Changes auto-save as you type or when you leave the field.</p>
+    </div>
+
+    <div class="p-4 rounded-lg border">
+      <div class="font-semibold mb-1">Stats</div>
+      <div class="text-sm">Paddocks in this pasture: <span id="paddock-count" class="font-semibold">—</span></div>
+      <div class="text-sm">Calculated area from map: <span id="map-acres" class="font-semibold">—</span></div>
+    </div>
+
+    <div class="p-4 rounded-lg border">
+      <div class="font-semibold mb-1">Map Tools</div>
+      <p class="text-sm mb-2 muted">Use the on-map buttons to add or edit paddocks. Saves happen automatically.</p>
+      <div class="flex gap-2 flex-wrap">
+        <button id="zoom-to" class="px-3 py-1 border rounded">Zoom to Pasture</button>
+        <button id="revert-geometry" class="px-3 py-1 border rounded">Reload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="pasture-map" data-pk="{{ pasture.pk }}"></div>
+
+  <!-- CSRF token -->
+  <form id="csrf-form">{% csrf_token %}</form>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const mapEl = document.getElementById("pasture-map");
+  if (!mapEl) return;
+
+  const pk = String(mapEl.dataset.pk || "").trim();
+  const PASTURE_UPDATE_URL = `/pastures/${pk}/update/`;
+
+  // ---------------- CSRF helper ----------------
+  const getCSRF = () => {
+    const fromInput = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+    if (fromInput) return fromInput;
+    const m = document.cookie.match(/(?:^|;)\s*csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  };
+
+  // ------------- Pasture field autosave (name) -------------
+  const autosaveField = (field, value) => {
+    const form = new FormData();
+    form.append("field", field);
+    form.append("value", typeof value === "string" ? value : JSON.stringify(value));
+    return fetch(PASTURE_UPDATE_URL, {
+      method: "POST",
+      headers: { "X-CSRFToken": getCSRF() },
+      body: form
+    }).catch((e) => console.warn("[PastureDetail] Field save failed:", e));
+  };
+
+  const bindAutosave = (el, field) => {
+    if (!el) return;
+    let t = null;
+    const save = () => autosaveField(field, el.value);
+    el.addEventListener("change", save);
+    el.addEventListener("blur", save);
+    el.addEventListener("input", () => { clearTimeout(t); t = setTimeout(save, 600); });
+  };
+
+  bindAutosave(document.getElementById("pasture-name"), "name");
+
+  // ---------------- Visual helpers ----------------
+  function ensurePanes(map) {
+    if (!map.getPane("pastures")) {
+      map.createPane("pastures");
+      map.getPane("pastures").style.zIndex = 450;
+    }
+    if (!map.getPane("paddocks")) {
+      map.createPane("paddocks");
+      map.getPane("paddocks").style.zIndex = 460;
+    }
+  }
+
+  function paddockStyle() {
+    return { color: "#0ea5e9", weight: 2, dashArray: "6,6", lineCap: "round", fillOpacity: 0.10 };
+  }
+
+  function pastureStyle() {
+    return { color: "#16a34a", weight: 2, fillOpacity: 0.10 };
+  }
+
+  function addLegend(map) {
+    const legend = L.control({ position: "bottomright" });
+    legend.onAdd = function () {
+      const div = L.DomUtil.create("div");
+      div.className = "leaflet-control leaflet-bar";
+      div.style.background = "white";
+      div.style.padding = "8px 10px";
+      div.style.borderRadius = "10px";
+      div.style.boxShadow = "0 10px 15px -3px rgba(15, 23, 42, 0.15)";
+      div.style.fontSize = "12px";
+      div.style.lineHeight = "1.2";
+
+      div.innerHTML =
+        "<div style='font-weight:700;margin-bottom:6px;'>Legend</div>" +
+        "<div style='margin:4px 0;white-space:nowrap;'>" +
+          "<span style='display:inline-block;width:14px;height:10px;margin-right:8px;vertical-align:middle;" +
+          "border:2px solid #16a34a;background:rgba(22,163,74,0.15);'></span>" +
+          "Pasture boundary" +
+        "</div>" +
+        "<div style='margin:4px 0;white-space:nowrap;'>" +
+          "<span style='display:inline-block;width:14px;height:10px;margin-right:8px;vertical-align:middle;" +
+          "border:2px solid #0ea5e9;border-style:dashed;background:rgba(14,165,233,0.10);'></span>" +
+          "Paddock boundary" +
+        "</div>";
+      return div;
+    };
+    legend.addTo(map);
+  }
+
+  // ---------------- ID helpers ----------------
+  function getFeatureId(layer) {
+    const f = layer?.feature || null;
+    const props = f?.properties || {};
+    return props.id || f?.id || layer?.options?.paddockId || null;
+  }
+
+  function setFeatureId(layer, id) {
+    // store in a predictable place
+    layer.options = layer.options || {};
+    layer.options.paddockId = id;
+    layer.feature = layer.feature || { type: "Feature", properties: {}, geometry: null };
+    layer.feature.properties = layer.feature.properties || {};
+    layer.feature.properties.id = id;
+  }
+
+  // ---------------- API calls ----------------
+  function savePaddockGeometry(paddockId, geom) {
+    const url = `/pastures/paddock/${paddockId}/update/`;   // your existing endpoint
+    const form = new FormData();
+    form.append("field", "geometry");
+    form.append("value", JSON.stringify(geom));
+    return fetch(url, {
+      method: "POST",
+      headers: { "X-CSRFToken": getCSRF() },
+      body: form
+    }).then(r => {
+      if (!r.ok) throw new Error("Save failed: " + r.status);
+      return r.text();
+    });
+  }
+
+  function createPaddockViaAPI(name, geom) {
+    return fetch("/api/paddocks/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRF()
+      },
+      body: JSON.stringify({
+        pasture: Number(pk),
+        name: name,
+        geometry: geom
+      })
+    }).then(r => {
+      if (!r.ok) throw new Error("Create failed: " + r.status);
+      return r.json();
+    });
+  }
+
+  function fetchPaddocksForPasture() {
+    // Uses the filter supported in the pasture_api.py I gave you
+    return fetch(`/api/paddocks/?pasture=${encodeURIComponent(pk)}`, {
+      headers: { "X-CSRFToken": getCSRF() }
+    }).then(r => {
+      if (!r.ok) throw new Error("Fetch paddocks failed: " + r.status);
+      return r.json();
+    });
+  }
+
+  // ---------------- Custom on-map toolbar (bigger, spaced buttons) ----------------
+  const PaddockToolsControl = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd: function(map) {
+      const container = L.DomUtil.create("div");
+      container.className = "paddock-tools-control";
+      container.style.background = "white";
+      container.style.padding = "10px";
+      container.style.borderRadius = "14px";
+      container.style.boxShadow = "0 12px 20px -8px rgba(15, 23, 42, 0.25)";
+      container.style.border = "1px solid rgba(229, 231, 235, 1)";
+      container.style.minWidth = "180px";
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+
+      const title = L.DomUtil.create("div", "", container);
+      title.textContent = "Paddock Tools";
+      title.style.fontWeight = "700";
+      title.style.fontSize = "12px";
+      title.style.color = "#111827";
+      title.style.marginBottom = "8px";
+
+      function mkBtn(label, variant) {
+        const btn = L.DomUtil.create("button", "", container);
+        btn.type = "button";
+        btn.textContent = label;
+        btn.style.width = "100%";
+        btn.style.display = "block";
+        btn.style.padding = "10px 12px";
+        btn.style.borderRadius = "12px";
+        btn.style.fontSize = "13px";
+        btn.style.fontWeight = "600";
+        btn.style.lineHeight = "1";
+        btn.style.cursor = "pointer";
+        btn.style.marginBottom = "8px";
+        btn.style.userSelect = "none";
+
+        if (variant === "primary") {
+          btn.style.background = "#0284c7";
+          btn.style.color = "white";
+          btn.style.border = "1px solid #0284c7";
+        } else if (variant === "success") {
+          btn.style.background = "#059669";
+          btn.style.color = "white";
+          btn.style.border = "1px solid #059669";
+        } else {
+          btn.style.background = "white";
+          btn.style.color = "#111827";
+          btn.style.border = "1px solid #d1d5db";
+        }
+
+        btn.onmouseenter = () => { btn.style.filter = "brightness(0.97)"; };
+        btn.onmouseleave = () => { btn.style.filter = "none"; };
+
+        return btn;
+      }
+
+      const btnAdd  = mkBtn("➕ Add Paddock", "primary");
+      const btnEdit = mkBtn("✏️ Edit Paddocks", "default");
+      const btnDone = mkBtn("✅ Finish & Save", "success");
+      btnDone.style.display = "none";
+      btnDone.style.marginBottom = "0";
+
+      container._btnAdd = btnAdd;
+      container._btnEdit = btnEdit;
+      container._btnDone = btnDone;
+      return container;
+    }
+  });
+
+  // ---------------- Load map via MapLoader ----------------
+  if (!(window.MapLoader && typeof MapLoader.loadPastureDetail === "function")) {
+    console.warn("[PastureDetail] MapLoader not found. Include static/js/maploader.js");
+    return;
+  }
+
+  const loaderOptions = {
+    el: mapEl,
+    pk,
+    updateUrl: PASTURE_UPDATE_URL,
+    getCSRF,
+    showLayerToggle: true,
+
+    // Disable MapLoader edit toolbar so it doesn't add "Edit layers/Delete layers"
+    enableEdit: false,
+    enablePaddockEdit: false,
+
+    onStats: ({ paddockCount, acres }) => {
+      const elCount = document.getElementById("paddock-count");
+      const elAcres  = document.getElementById("map-acres");
+      if (elCount) elCount.textContent = String(paddockCount ?? 0);
+      if (elAcres) {
+        const fmt = (typeof MapLoader !== "undefined" && MapLoader.fmt)
+          ? MapLoader.fmt
+          : (n, d=2) => (n == null ? "—" : Number(n).toFixed(d));
+        elAcres.textContent = fmt(acres, 2);
+      }
+    }
+  };
+
+  MapLoader.loadPastureDetail(loaderOptions).then(async ({ map, boundaryGroup }) => {
+    ensurePanes(map);
+    addLegend(map);
+
+    // style pasture boundary and keep it behind paddocks
+    try {
+      boundaryGroup.setStyle && boundaryGroup.setStyle(Object.assign({ pane: "pastures" }, pastureStyle()));
+      boundaryGroup.bringToBack && boundaryGroup.bringToBack();
+    } catch {}
+
+    // Zoom & reload helpers
+    document.getElementById("zoom-to")?.addEventListener("click", () => {
+      try {
+        const b = boundaryGroup.getBounds();
+        if (b && b.isValid && b.isValid()) map.fitBounds(b.pad(0.1));
+      } catch {}
+    });
+    document.getElementById("revert-geometry")?.addEventListener("click", () => window.location.reload());
+
+    // FeatureGroup that Leaflet.Draw edits (ONLY real paddock polygon layers go in here)
+    const paddocksGroup = new L.FeatureGroup();
+    map.addLayer(paddocksGroup);
+
+    // Load paddocks from API (avoid scraping map layers)
+    try {
+      const data = await fetchPaddocksForPasture();
+      const geo = (data && data.type === "FeatureCollection") ? data
+               : (Array.isArray(data?.results)) ? { type:"FeatureCollection", features:data.results }
+               : data;
+
+      const paddockGeo = L.geoJSON(geo, {
+        pane: "paddocks",
+        style: paddockStyle(),
+        filter: (feature) => {
+          // Only polygons with coords
+          const g = feature?.geometry;
+          if (!g || !g.type || !g.coordinates) return false;
+          if (!(g.type === "Polygon" || g.type === "MultiPolygon")) return false;
+          try { return JSON.stringify(g.coordinates).length > 10; } catch { return false; }
+        },
+        onEachFeature: (feature, layer) => {
+          const id = feature?.properties?.id || feature?.id;
+          if (id) setFeatureId(layer, id);
+          if (layer.setStyle) layer.setStyle(paddockStyle());
+          paddocksGroup.addLayer(layer);
+        }
+      });
+      // Add to map for display (FeatureGroup already holds them, but this ensures styling is applied consistently)
+      paddockGeo.addTo(map);
+    } catch (e) {
+      console.warn("[PastureDetail] Failed to load paddocks:", e);
+    }
+
+    // Leaflet.Draw handlers (no default toolbar)
+    const drawPolygonHandler = new L.Draw.Polygon(map, {
+      allowIntersection: false,
+      showArea: true,
+      shapeOptions: Object.assign({ pane: "paddocks" }, paddockStyle())
+    });
+
+    const editHandler = new L.EditToolbar.Edit(map, {
+      featureGroup: paddocksGroup,
+      selectedPathOptions: { maintainColor: true, dashArray: "6,6", fillOpacity: 0.10 }
+    });
+
+    let isEditing = false;
+
+    // Add custom control
+    const toolsControl = new PaddockToolsControl();
+    map.addControl(toolsControl);
+
+    const ctrlContainer = toolsControl.getContainer();
+    const btnAdd  = ctrlContainer?._btnAdd;
+    const btnEdit = ctrlContainer?._btnEdit;
+    const btnDone = ctrlContainer?._btnDone;
+
+    function setEditingUI(editing) {
+      isEditing = !!editing;
+      if (btnDone) btnDone.style.display = isEditing ? "block" : "none";
+      if (btnAdd)  btnAdd.disabled  = isEditing;
+      if (btnEdit) btnEdit.disabled = isEditing;
+
+      [btnAdd, btnEdit].forEach(b => {
+        if (!b) return;
+        b.style.opacity = b.disabled ? "0.55" : "1";
+        b.style.cursor = b.disabled ? "not-allowed" : "pointer";
+      });
+    }
+
+    btnAdd && (btnAdd.onclick = (e) => {
+      e.preventDefault();
+      if (isEditing) return;
+      drawPolygonHandler.enable();
+    });
+
+    btnEdit && (btnEdit.onclick = (e) => {
+      e.preventDefault();
+      if (isEditing) return;
+      setEditingUI(true);
+
+      // IMPORTANT: only enable if we actually have layers
+      if (paddocksGroup.getLayers().length === 0) {
+        console.warn("[PastureDetail] No paddocks to edit.");
+        setEditingUI(false);
+        return;
+      }
+
+      editHandler.enable();
+    });
+
+    // Auto-save whenever editing stops (leaflet.draw emits EDITED)
+    map.on(L.Draw.Event.EDITED, function(ev) {
+      const edited = ev.layers;
+      edited.eachLayer(function(layer){
+        const id = getFeatureId(layer);
+        if (!id) return;
+        const geom = layer.toGeoJSON().geometry;
+
+        savePaddockGeometry(id, geom)
+          .then(() => console.log("[PastureDetail] autosaved paddock", id))
+          .catch(err => console.error("[PastureDetail] autosave error", id, err));
+      });
+    });
+
+    btnDone && (btnDone.onclick = (e) => {
+      e.preventDefault();
+      if (!isEditing) return;
+
+      // disabling edit triggers EDITED event already, but we keep a final sweep too
+      editHandler.disable();
+      setEditingUI(false);
+
+      paddocksGroup.eachLayer(function(layer){
+        const id = getFeatureId(layer);
+        if (!id) return;
+        const geom = layer.toGeoJSON().geometry;
+        savePaddockGeometry(id, geom)
+          .then(() => console.log("[PastureDetail] saved paddock", id))
+          .catch(err => console.error("[PastureDetail] save error", id, err));
+      });
+    });
+
+    // When draw completes -> create via API -> add returned paddock to group
+    map.on(L.Draw.Event.CREATED, function(e) {
+      const layer = e.layer;
+      if (layer.setStyle) layer.setStyle(Object.assign({ pane: "paddocks" }, paddockStyle()));
+
+      const geom = layer.toGeoJSON().geometry;
+      const name = prompt("Paddock name?", "New Paddock") || "New Paddock";
+
+      createPaddockViaAPI(name, geom)
+        .then(created => {
+          // DRF-GIS returns GeoJSON Feature by default
+          const feature = (created && created.type === "Feature") ? created : {
+            type: "Feature",
+            id: created.id,
+            properties: { id: created.id, name: created.name || name, pasture: Number(pk) },
+            geometry: created.geometry || created.boundary
+          };
+
+          const g = L.geoJSON(feature, { pane: "paddocks", style: paddockStyle() });
+          g.eachLayer(function(l){
+            const id = feature?.properties?.id || feature?.id || created?.id;
+            if (id) setFeatureId(l, id);
+            paddocksGroup.addLayer(l);
+          });
+          g.addTo(map);
+        })
+        .catch(err => console.error("[PastureDetail] create paddock error:", err));
+    });
+
+    console.debug("[PastureDetail] ready; paddocks:", paddocksGroup.getLayers().length);
+  }).catch(err => {
+    console.error("[PastureDetail] MapLoader.loadPastureDetail failed:", err);
+  });
+});
+</script>
+{% endblock %}

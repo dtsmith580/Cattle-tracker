@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Leased Bulls</h1>
+
+<a href="{% url 'create_leased_bull' %}" class="inline-block mb-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+  ➕ Add Leased Bull
+</a>
+
+<table class="min-w-full bg-white shadow rounded-lg overflow-hidden">
+  <thead class="bg-gray-100 text-left text-sm font-medium text-gray-700">
+    <tr>
+	  <th class="px-4 py-2"></th>
+      <th class="px-4 py-2">Ear Tag</th>
+      <th class="px-4 py-2">Breed</th>
+      <th class="px-4 py-2">DOB</th>
+      <th class="px-4 py-2">Owner</th>
+      <th class="px-4 py-2">Lease Start</th>
+      <th class="px-4 py-2">Lease End</th>
+      <th class="px-4 py-2 text-right">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for leased_bull in leased_bulls %}
+    <tr class="border-t">
+	  <td class="px-4 py-2">
+        {% if leased_bull.image %}
+          <img src="{{ leased_bull.image.url }}" alt="{{ leased_bull.ear_tag }}" class="h-12 w-12 object-cover rounded border" />
+        {% else %}
+          <span class="text-sm text-gray-400 italic">No image</span>
+        {% endif %}
+      </td>
+      <td class="px-4 py-2"><a href="{% url 'leased_bull_detail' leased_bull.id %}" class="text-blue-600 hover:underline">{{ leased_bull.ear_tag }}</td>
+      <td class="px-4 py-2">{{ leased_bull.breed }}</td>
+      <td class="px-4 py-2">{{ leased_bull.dob }}</td>
+      <td class="px-4 py-2">{{ leased_bull.owner_name }}</td>
+      <td class="px-4 py-2">{{ leased_bull.lease_start }}</td>
+      <td class="px-4 py-2">{{ leased_bull.lease_end|default:"Ongoing" }}</td>
+      <td class="px-4 py-2 text-right">
+        <a href="{% url 'delete_leased_bull' leased_bull.id %}" class="ml-4 text-red-600 hover:underline" onclick="return confirm('Are you sure you want to delete this leased bull?');">🗑️</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" class="px-4 py-4 text-center text-gray-500">No leased bulls found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

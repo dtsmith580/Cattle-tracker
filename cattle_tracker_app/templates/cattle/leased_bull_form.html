@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Add Leased Bull</h1>
+
+<div class="bg-white shadow rounded-lg p-6 space-y-4 mx-auto w-full max-w-screen-sm">
+  <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    {% csrf_token %}
+
+    <div class="flex items-center space-x-4">
+  <label for="id_ear_tag" class="w-32 text-sm font-medium text-gray-700">Ear Tag</label>
+  <input type="text" name="ear_tag" id="id_ear_tag" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.ear_tag.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_breed" class="w-32 text-sm font-medium text-gray-700">Breed</label>
+  <input type="{{ form.breed.field.widget.input_type }}" name="breed" id="id_breed" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.breed.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_dob" class="w-32 text-sm font-medium text-gray-700">Date of Birth</label>
+  <input type="{{ form.dob.field.widget.input_type }}" name="dob" id="id_dob" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.dob.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_owner_name" class="w-32 text-sm font-medium text-gray-700">Owner Name</label>
+  <input type="{{ form.owner_name.field.widget.input_type }}" name="owner_name" id="id_owner_name" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.owner_name.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_lease_start" class="w-32 text-sm font-medium text-gray-700">Lease Start</label>
+  <input type="{{ form.lease_start.field.widget.input_type }}" name="lease_start" id="id_lease_start" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.lease_start.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_lease_end" class="w-32 text-sm font-medium text-gray-700">Lease End</label>
+  <input type="{{ form.lease_end.field.widget.input_type }}" name="lease_end" id="id_lease_end" class="w-full max-w-xs border-gray-300 rounded-md shadow-sm" value="{{ form.lease_end.value }}">
+</div>
+
+    <div class="flex items-center space-x-4">
+  <label for="id_image" class="w-32 text-sm font-medium text-gray-700">Image</label>
+  {{ form.image }}
+</div>
+
+    <div class="pt-4">
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
+      <a href="{% url 'leased_bull_list' %}" class="ml-4 text-gray-600 hover:underline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

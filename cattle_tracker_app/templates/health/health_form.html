@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{% if record %}Edit Health Record{% else %}Add Health Record{% endif %}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">{% if record %}Edit Health Record{% else %}Add Health Record{% endif %}</h1>
+
+<form method="post" enctype="multipart/form-data" class="bg-white shadow rounded-lg p-6 space-y-4">
+  {% csrf_token %}
+  {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div>{{ form.cattle.label_tag }} {{ form.cattle }}</div>
+    <div>{{ form.date.label_tag }} {{ form.date }}</div>
+    <div>{{ form.event_type.label_tag }} {{ form.event_type }}</div>
+    <div>{{ form.title.label_tag }} {{ form.title }}</div>
+    <div class="md:col-span-2">{{ form.description.label_tag }} {{ form.description }}</div>
+    <div>{{ form.performed_by.label_tag }} {{ form.performed_by }}</div>
+    <div>{{ form.cost.label_tag }} {{ form.cost }}</div>
+    <div>{{ form.next_due.label_tag }} {{ form.next_due }}</div>
+    <div class="md:col-span-2">{{ form.attachment.label_tag }} {{ form.attachment }}</div>
+  </div>
+
+  {# === Multi‑vaccine block (shown for Vaccination AND Illness) === #}
+  {% if formset %}
+    {{ formset.management_form }}
+    <div id="vaccinations-block" class="hidden border-t pt-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-semibold">Vaccinations</h2>
+        <button type="button" id="add-vax" class="px-3 py-1 rounded border">+ Add another vaccine</button>
+      </div>
+
+      {% if formset.non_form_errors %}
+        <div class="text-red-600 text-sm mb-2">{{ formset.non_form_errors }}</div>
+      {% endif %}
+
+      <div id="vax-forms" class="space-y-4">
+        {% for f in formset %}
+          <div class="p-4 rounded border vax-form-row">
+            {{ f.non_field_errors }}
+            <div class="grid md:grid-cols-3 gap-4">
+              <div>{{ f.vaccine_name.label_tag }} {{ f.vaccine_name }}</div>
+              <div>{{ f.dose.label_tag }} {{ f.dose }}</div>
+              <div>{{ f.administration_method.label_tag }} {{ f.administration_method }}</div>
+              <div>{{ f.batch_number.label_tag }} {{ f.batch_number }}</div>
+              <div>{{ f.withdrawal_date.label_tag }} {{ f.withdrawal_date }}</div>
+              {% if formset.can_delete %}
+                <div class="flex items-center"><label class="inline-flex items-center gap-2 text-sm">{{ f.DELETE }} <span>Remove</span></label></div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# === Castration detail (toggle by JS) === #}
+  <div id="castration-fields" class="hidden border-t pt-4">
+    <h2 class="font-semibold mb-2">Castration Details</h2>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div>{{ form.method.label_tag }} {{ form.method }}</div>
+      <div>{{ form.age_days.label_tag }} {{ form.age_days }}</div>
+      <div class="md:col-span-3">{{ form.complications.label_tag }} {{ form.complications }}</div>
+    </div>
+  </div>
+
+  <div class="flex justify-end space-x-2">
+    <a href="{% url 'health_list' %}" class="px-3 py-2 rounded bg-gray-200">Cancel</a>
+    <button class="px-3 py-2 rounded bg-blue-600 text-white">Save</button>
+  </div>
+</form>
+
+<script>
+  (function(){
+    const eventSelect = document.getElementById('id_event_type');
+    const vaxBlock    = document.getElementById('vaccinations-block');
+    const castBlock   = document.getElementById('castration-fields');
+
+    function lc(v){ return (v || '').toString().toLowerCase(); }
+
+    function toggleExtras(){
+      const v = lc(eventSelect && eventSelect.value);
+      // Adjust strings here if your choice values differ
+      const showVax = (v === 'vaccination' || v === 'illness');
+      const showCast = (v === 'castration');
+      if (vaxBlock)  vaxBlock.classList.toggle('hidden', !showVax);
+      if (castBlock) castBlock.classList.toggle('hidden', !showCast);
+    }
+
+    if (eventSelect) {
+      eventSelect.addEventListener('change', toggleExtras);
+      toggleExtras();
+    }
+
+    // === Add formset rows dynamically ===
+    const addBtn   = document.getElementById('add-vax');
+    const container= document.getElementById('vax-forms');
+    const totalInp = document.getElementById('id_vax-TOTAL_FORMS');
+
+    function addRow(){
+      if (!container || !totalInp) return;
+      const total = parseInt(totalInp.value, 10);
+      const last  = container.querySelector('.vax-form-row:last-of-type');
+      if (!last) return;
+
+      const oldIdx = total - 1; // current last index
+      const newIdx = total;     // next index
+
+      let html = last.outerHTML
+        .replaceAll('vax-' + oldIdx + '-', 'vax-' + newIdx + '-')
+        .replaceAll('id_vax-' + oldIdx + '-', 'id_vax-' + newIdx + '-');
+
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      const row = wrap.firstElementChild;
+
+      // Clear values in new row
+      row.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+        else el.value = '';
+      });
+
+      container.appendChild(row);
+      totalInp.value = String(newIdx + 1);
+    }
+
+    if (addBtn) addBtn.addEventListener('click', addRow);
+  })();
+</script>
+{% endblock %}

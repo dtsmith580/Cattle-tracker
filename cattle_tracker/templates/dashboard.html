@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">Cattle Tracker Dashboard</h1>
+  <div class="mb-4">
+  <h4>Quick Actions</h4>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="/admin/cattle_tracker/cattle/add/" class="btn btn-success">➕ Add New Cattle</a>
+    <a href="#" class="btn btn-primary">⚖️ Log Weight</a>
+    <a href="/admin/cattle_tracker/breedinghistory/add/" class="btn btn-danger">❤️ Register Breeding</a>
+    <a href="#" class="btn btn-warning">💉 Log Health Check</a>
+  </div>
+</div>
+
+  
+  <p>Total Cattle: {{ total_cattle }}</p>
+  <p>Breeding Stock: {{ breeding_stock }}</p>
+  <p>Calves: {{ calves }}</p>
+
+  <h3>Active Alerts</h3>
+  {% if alerts %}
+    <ul class="list-group mb-4">
+      {% for alert in alerts %}
+        <li class="list-group-item list-group-item-warning">{{ alert.message }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">No alerts.</p>
+  {% endif %}
+{% endblock %}

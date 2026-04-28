@@ -1,0 +1,49 @@
+<form method="get" class="d-flex flex-wrap gap-2 mb-3">
+  <input type="text" name="search" class="form-control form-control-sm" placeholder="Search Ear Tag or Reg #" value="{{ request.GET.search }}" style="max-width: 150px;">
+
+  <select name="status" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Statuses</option>
+    <option value="alive" {% if request.GET.status == 'alive' %}selected{% endif %}>Alive</option>
+    <option value="sold" {% if request.GET.status == 'sold' %}selected{% endif %}>Sold</option>
+    <option value="dead" {% if request.GET.status == 'dead' %}selected{% endif %}>Dead</option>
+  </select>
+
+  <select name="breed" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Breeds</option>
+    {% for b in available_breeds %}
+      <option value="{{ b }}" {% if filter_breed == b %}selected{% endif %}>{{ b }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="pregnancy_status" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Preg Types</option>
+    <option value="open" {% if request.GET.pregnancy_status == 'open' %}selected{% endif %}>Open</option>
+    <option value="bred" {% if request.GET.pregnancy_status == 'bred' %}selected{% endif %}>Bred</option>
+  </select>
+
+  <select name="animal_type" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Types</option>
+    <option value="heifer" {% if request.GET.animal_type == 'heifer' %}selected{% endif %}>Heifer</option>
+    <option value="cow" {% if request.GET.animal_type == 'cow' %}selected{% endif %}>Cow</option>
+    <option value="bull" {% if request.GET.animal_type == 'bull' %}selected{% endif %}>Bull</option>
+    <option value="steer" {% if request.GET.animal_type == 'steer' %}selected{% endif %}>Steer</option>
+  </select>
+
+  <select name="sire_type" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Sire Types</option>
+    <option value="owned" {% if filter_sire_type == 'owned' %}selected{% endif %}>Owned</option>
+    <option value="donor" {% if filter_sire_type == 'donor' %}selected{% endif %}>Donor</option>
+  </select>
+
+  {% if available_owners|length > 1 %}
+  <select name="owner" class="form-select form-select-sm" style="max-width: 150px;">
+    <option value="">All Owners</option>
+    {% for o in available_owners %}
+      <option value="{{ o.id }}" {% if filter_owner == o.id|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+
+  <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+  <a href="{% url 'cattle_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+</form>

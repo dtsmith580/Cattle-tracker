@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-3">
+  <h2 class="mb-3">Breeding History Admin</h2>
+
+  <form method="post" enctype="multipart/form-data" class="mb-3">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="id_cow" class="form-label">Cow</label>
+        {{ form.cow }}
+      </div>
+
+      <div class="col-md-4">
+        <label for="id_method" class="form-label">Method</label>
+        {{ form.method }}
+      </div>
+
+      <div class="col-md-4" id="bull-wrapper">
+        <label for="id_bull" class="form-label">Bull</label>
+        {{ form.bull }}
+      </div>
+
+      <div class="col-md-4" id="herd-sire-wrapper" style="display: none;">
+        <label for="id_herd_sire" class="form-label">AI Sire</label>
+        {{ form.herd_sire }}
+      </div>
+
+      <div class="col-md-4">
+        <label for="id_cleanup_method" class="form-label">Cleanup Method</label>
+        {{ form.cleanup_method }}
+      </div>
+
+      <div class="col-md-4" id="cleanup-sire-wrapper" style="display: none;">
+        <label for="id_cleanup_sire" class="form-label">Cleanup Bull</label>
+        {{ form.cleanup_sire }}
+      </div>
+
+      <div class="col-md-4" id="cleanup-herd-sire-wrapper" style="display: none;">
+        <label for="id_cleanup_herd_sire" class="form-label">Cleanup AI Sire</label>
+        {{ form.cleanup_herd_sire }}
+      </div>
+
+      <div class="col-md-12">
+        <label for="id_notes" class="form-label">Notes</label>
+        {{ form.notes }}
+      </div>
+
+      <div class="col-md-12">
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </form>
+
+  <hr>
+  <h4 class="mb-3">Recent Breeding Records</h4>
+  {% if breeding_records %}
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Cow</th>
+          <th>Date</th>
+          <th>Method</th>
+          <th>Sire</th>
+          <th>Cleanup</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in breeding_records %}
+        <tr>
+          <td>{{ record.cow.ear_tag }}</td>
+          <td>{{ record.breeding_date }}</td>
+          <td>{{ record.get_method_display }}</td>
+          <td>
+            {% if record.method == 'ai' %}
+              {{ record.herd_sire.name }} (AI)
+            {% else %}
+              {{ record.bull.ear_tag }} (Bull)
+            {% endif %}
+          </td>
+          <td>
+            {% if record.cleanup_method == 'ai' %}
+              {{ record.cleanup_herd_sire.name }} (AI)
+            {% elif record.cleanup_method == 'natural' %}
+              {{ record.cleanup_sire.ear_tag }} (Bull)
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'edit_breeding_record' record.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{% url 'delete_breeding_record' record.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this record?')">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="text-muted">No recent records.</p>
+  {% endif %}
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const methodSelect = document.getElementById("id_method");
+    const bullWrapper = document.getElementById("bull-wrapper");
+    const herdSireWrapper = document.getElementById("herd-sire-wrapper");
+
+    const cleanupSelect = document.getElementById("id_cleanup_method");
+    const cleanupSireWrapper = document.getElementById("cleanup-sire-wrapper");
+    const cleanupHerdSireWrapper = document.getElementById("cleanup-herd-sire-wrapper");
+
+    function toggleMethodFields() {
+      if (methodSelect.value === 'ai') {
+        bullWrapper.style.display = 'none';
+        herdSireWrapper.style.display = 'block';
+      } else {
+        bullWrapper.style.display = 'block';
+        herdSireWrapper.style.display = 'none';
+      }
+    }
+
+    function toggleCleanupFields() {
+      if (cleanupSelect.value === 'ai') {
+        cleanupSireWrapper.style.display = 'none';
+        cleanupHerdSireWrapper.style.display = 'block';
+      } else if (cleanupSelect.value === 'natural') {
+        cleanupSireWrapper.style.display = 'block';
+        cleanupHerdSireWrapper.style.display = 'none';
+      } else {
+        cleanupSireWrapper.style.display = 'none';
+        cleanupHerdSireWrapper.style.display = 'none';
+      }
+    }
+
+    methodSelect.addEventListener("change", toggleMethodFields);
+    cleanupSelect.addEventListener("change", toggleCleanupFields);
+
+    toggleMethodFields();
+    toggleCleanupFields();
+  });
+</script>
+{% endblock %}

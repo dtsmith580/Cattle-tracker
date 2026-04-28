@@ -1,0 +1,58 @@
+{# templates/cattle/bull_pen_list.html #}
+{% extends "base.html" %}
+{% block title %}Bull Pen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">🐂 Bull Pen</h1>
+
+<div class="mb-4">
+  <a href="{% url 'herd_bull_create' %}" class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">+ Add Herd Bull</a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for hb in bulls %}
+  <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex gap-4">
+    <a href="{% url 'herd_bull_detail' hb.pk %}" class="w-28 shrink-0 block">
+      {% if hb.cattle.image %}
+        <img src="{{ hb.cattle.image.url }}" class="rounded-lg w-28 h-28 object-cover border" alt="Herd bull {{ hb.cattle.ear_tag|default:'(no tag)'}}">
+      {% else %}
+        <span class="w-28 h-28 rounded-lg border flex items-center justify-center text-gray-400">No Image</span>
+      {% endif %}
+    </a>
+
+    <div class="flex-1">
+      <div class="flex justify-between items-start">
+        <div>
+          <a href="{% url 'herd_bull_detail' hb.pk %}" class="font-semibold">
+            {{ hb.cattle.ear_tag|default:"(no tag)" }}
+          </a>
+          <div class="text-sm text-gray-500">
+            Owner: {{ hb.cattle.owner.name }}{% if hb.cattle.registration_number %} • Reg: {{ hb.cattle.registration_number }}{% endif %}
+          </div>
+        </div>
+        {# Edit button removed #}
+      </div>
+
+      <div class="mt-2 text-sm">
+        <div>Fertility: {{ hb.fertility_status|default:"—" }}{% if hb.fertility_test_date %} ({{ hb.fertility_test_date }}){% endif %}</div>
+        <div>Calves sired: {{ hb.total_calves_sired }}</div>
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="text-sm text-gray-500">No herd bulls found.</div>
+{% endfor %}
+
+</div>
+
+{% if bulls.has_other_pages %}
+  <div class="mt-4 flex gap-2">
+    {% if bulls.has_previous %}
+      <a class="px-3 py-1 border rounded" href="?page={{ bulls.previous_page_number }}">Prev</a>
+    {% endif %}
+    <span class="px-3 py-1">Page {{ bulls.number }} of {{ bulls.paginator.num_pages }}</span>
+    {% if bulls.has_next %}
+      <a class="px-3 py-1 border rounded" href="?page={{ bulls.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

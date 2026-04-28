@@ -1,0 +1,5 @@
+<form hx-post="{% url 'leasedbulls:create' %}" hx-target="#leased-bull-table" hx-swap="beforeend" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Add Leased Bull</button>
+</form>

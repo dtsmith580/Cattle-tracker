@@ -1,0 +1,15 @@
+<div class="bg-white rounded-2xl shadow p-4 mb-6 border-l-4 border-red-500 relative">
+  <button class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onclick="toggleEdit('alerts')">✏️</button>
+  <h3 class="text-lg font-medium text-red-600 mb-3">⚠ Alerts</h3>
+  <ul class="space-y-2">
+    {% if cattle.health_records.last %}
+      <li><strong class="text-green-600">✔ Last health check:</strong> {{ cattle.health_records.last.date|date:'M d, Y' }}</li>
+    {% endif %}
+    {% if cattle.weight_logs.last and cattle.weight_logs.last.weight < 70 %}
+      <li><strong class="text-red-600">📉 Weight Alert:</strong> Weight below threshold.</li>
+    {% endif %}
+    {% if not cattle.health_records.exists and not cattle.weight_logs.exists %}
+      <li class="text-gray-500">No alerts at this time.</li>
+    {% endif %}
+  </ul>
+</div>

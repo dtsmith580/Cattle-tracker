@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">🚨 Alerts</h1>
+  </div>
+
+  {% if alerts %}
+    <div class="space-y-3">
+      {% for a in alerts %}
+        <div class="p-4 rounded-lg border bg-white dark:bg-gray-900">
+          <div class="flex justify-between gap-4">
+            <div>
+              <div class="font-semibold">
+                {{ a.get_alert_type_display }} — {{ a.cattle.ear_tag }}
+              </div>
+              <div class="text-sm opacity-80">{{ a.message }}</div>
+              <div class="text-xs opacity-60 mt-1">
+                Due: {{ a.alert_date|date:"M j, Y g:i A" }}
+                {% if a.snoozed_until %} • Snoozed until {{ a.snoozed_until|date:"M j, Y g:i A" }}{% endif %}
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+              <form method="post" action="{% url 'alert_resolve' a.pk %}">
+                {% csrf_token %}
+                <button class="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700">Resolve</button>
+              </form>
+
+              <form method="post" action="{% url 'alert_snooze' a.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="days" value="7">
+                <button class="px-3 py-1 rounded bg-yellow-600 text-white text-sm hover:bg-yellow-700">Snooze 7d</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="p-4 rounded bg-green-50 dark:bg-green-900/30">
+      No open alerts 🎉
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

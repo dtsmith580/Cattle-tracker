@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pastures & Paddocks{% endblock title %}
+
+{% block extra_head %}
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <!-- Turf.js (for area → acres, like dashboard) -->
+  <script src="{% static 'vendor/turf.min.js' %}"></script>
+  <style>
+    #pasture-list-map {
+      height: 50vh;
+      min-height: 360px;
+      border-radius: 0.75rem;
+      background: #e5e7eb; /* light gray so you can see the box even if Leaflet fails */
+    }
+
+    .click-card {
+      cursor: pointer;
+      transition: box-shadow 0.15s ease, transform 0.1s ease;
+    }
+    .click-card:hover {
+      box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.2);
+      transform: translateY(-1px);
+    }
+  </style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Pastures &amp; Paddocks</h1>
+      <p class="text-sm text-gray-500">
+        Overview of all pastures with their paddocks, acres, and quick navigation.
+        Double-click a pasture card or paddock chip to open its detail page.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'pasture_create' %}"
+         class="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">
+        <span class="mr-1">➕</span> New Pasture
+      </a>
+      <a href="{% url 'paddock_create' %}"
+         class="inline-flex items-center px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">
+        <span class="mr-1">➕</span> New Paddock
+      </a>
+    </div>
+  </div>
+
+  <!-- Map card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-gray-700">Ranch Map</h2>
+      <p class="text-xs text-gray-400">Single-click shows info, double-click opens detail page.</p>
+    </div>
+    <div id="pasture-list-map" class="overflow-hidden"></div>
+  </div>
+
+  <!-- Summary strip (values will be updated by JS based on GeoJSON, like dashboard) -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pastures</p>
+      <p class="mt-1 text-2xl font-bold text-gray-900" id="total-pastures-value">
+        {{ pastures|length }}
+      </p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Acres (sum)</p>
+      <p class="mt-1 text-2xl font-bold text-gray-900" id="total-pasture-acres-value">
+        {{ total_pasture_acres|default:"—" }}
+      </p>
+      <p class="mt-1 text-xs text-gray-400">Updated from map geometry, just like the dashboard.</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Paddocks</p>
+      <p class="mt-1 text-2xl font-bold text-gray-900" id="total-paddocks-value">
+        {{ total_paddocks|default:"—" }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Pasture list -->
+  <div class="space-y-4 mt-4">
+    {% if pastures %}
+      {% for pasture in pastures %}
+        <article
+          class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 click-card"
+          data-dbl-href="{% url 'pasture_detail' pasture.pk %}"
+          data-pasture-id="{{ pasture.id }}"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-lg font-semibold text-gray-900">
+                  {{ pasture.name|default:"Unnamed pasture" }}
+                </h2>
+
+                <!-- Acres will be filled from GeoJSON via JS to match dashboard -->
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 js-pasture-acres">
+                  — ac
+                </span>
+
+                {% with paddock_count=pasture.paddock_count|default:pasture.paddocks.count %}
+                  {% if paddock_count %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-100">
+                      {{ paddock_count }} paddock{{ paddock_count|pluralize }}
+                    </span>
+                  {% endif %}
+                {% endwith %}
+              </div>
+              <p class="text-sm text-gray-500">
+                {{ pasture.description|default:"No description yet for this pasture." }}
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <a href="{% url 'pasture_detail' pasture.pk %}"
+                 class="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                View detail
+              </a>
+              <a href="{% url 'pasture_update_field' pasture.pk %}"
+                 class="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500 hover:bg-gray-50">
+                Quick edit
+              </a>
+            </div>
+          </div>
+
+          <!-- Paddocks -->
+          <div class="mt-4 border-t border-gray-100 pt-3">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Paddocks
+              </p>
+            </div>
+            {% with paddocks=pasture.paddocks.all %}
+              {% if paddocks %}
+                <div class="flex flex-wrap gap-2">
+                  {% for paddock in paddocks %}
+                    <div
+                      class="inline-flex items-center px-2.5 py-1 rounded-full border border-sky-200 bg-sky-50 text-xs text-sky-800 hover:bg-sky-100 cursor-pointer"
+                      data-dbl-href="{% url 'paddock_detail' paddock.pk %}"
+                      data-paddock-id="{{ paddock.id }}"
+                      title="Double-click to open paddock detail"
+                    >
+                      <span class="font-semibold">
+                        {{ paddock.name|default:"Paddock " }}{% if not paddock.name %}{{ paddock.pk }}{% endif %}
+                      </span>
+                      <!-- Acres filled from GeoJSON -->
+                      <span class="ml-1 text-[11px] opacity-80 js-paddock-acres">
+                        <!-- will be replaced by JS -->
+                      </span>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="text-xs text-gray-400">No paddocks created yet for this pasture.</p>
+              {% endif %}
+            {% endwith %}
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <div class="bg-white border border-dashed border-gray-300 rounded-xl p-6 text-center text-sm text-gray-500">
+        No pastures yet. Use the <span class="font-semibold">New Pasture</span> button above to create your first one.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Leaflet JS + map init AFTER content so DOM is ready -->
+<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'vendor/turf.min.js' %}"></script>
+<script src="{% static 'js/map/geojson_map_utils.js' %}"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("[PastureList] DOM ready, initializing map…");
+
+    // Double-click navigation for cards & paddock chips
+    document.querySelectorAll("[data-dbl-href]").forEach(function (el) {
+      el.addEventListener("dblclick", function () {
+        var href = el.getAttribute("data-dbl-href");
+        if (href) window.location.href = href;
+      });
+    });
+
+    var mapEl = document.getElementById("pasture-list-map");
+    if (!mapEl || !window.L) return;
+
+    var map = L.map("pasture-list-map", { doubleClickZoom: false });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
+
+    // Default view only if geometry doesn't load
+    map.setView([34.0375, -96.8047], 14);
+
+    // Ensure pane ordering
+    MapUtils.createPanes(map);
+
+    // Feature groups
+    var pastureGroup = L.featureGroup().addTo(map);
+    var paddockGroup = L.featureGroup().addTo(map);
+
+    // Counters / totals
+    var totalPastures = 0;
+    var totalPaddocks = 0;
+    var totalPastureAcres = 0;
+    var anyFeature = false;
+
+    var totalPasturesEl = document.getElementById("total-pastures-value");
+    var totalPastureAcresEl = document.getElementById("total-pasture-acres-value");
+    var totalPaddocksEl = document.getElementById("total-paddocks-value");
+
+    function resolveAcres(props, feature, type) {
+      var acres = null;
+
+      if (props) {
+        acres = (type === "paddock")
+          ? (props.paddock_acres || props.acres || props.size_acres || props.area_acres || null)
+          : (props.pasture_acres || props.total_acres || props.acres || props.size_acres || props.area_acres || null);
+      }
+
+      if (acres == null) acres = MapUtils.computeAcresFromGeom(feature);
+
+      if (acres != null) {
+        var n = parseFloat(acres);
+        if (!isNaN(n)) return n;
+      }
+      return null;
+    }
+
+    function updatePastureCardAcres(pastureId, acres) {
+      if (!pastureId || acres == null) return;
+      var badge = document.querySelector('[data-pasture-id="' + pastureId + '"] .js-pasture-acres');
+      if (badge) badge.textContent = acres.toFixed(2) + " ac";
+    }
+
+    function updatePaddockChipAcres(paddockId, acres) {
+      if (!paddockId || acres == null) return;
+      var chip = document.querySelector('[data-paddock-id="' + paddockId + '"] .js-paddock-acres');
+      if (chip) chip.textContent = "(" + acres.toFixed(2) + " ac)";
+    }
+
+    // Legend upgrade
+    MapUtils.addLegend(map, [
+      { label: "Pasture boundary", color: "#16a34a", fill: "rgba(22,163,74,0.15)" },
+      { label: "Paddock boundary", color: "#0ea5e9", dashed: true, fill: "rgba(14,165,233,0.10)" }
+    ], "bottomright");
+
+    // Strong dash + force SVG so dotted always works
+    var svgRenderer = L.svg();
+
+    function addPastures(geo) {
+      var baseStyle = { color: "#16a34a", weight: 2, fillOpacity: 0.15 };
+
+      var layer = L.geoJSON(geo, {
+        pane: "pastures",
+        renderer: svgRenderer,
+        style: function () { return baseStyle; },
+        onEachFeature: function (feature, lyr) {
+          anyFeature = true;
+
+          var props = feature.properties || {};
+          var id = props.id || feature.id;
+          var name = MapUtils.resolveName(props, "Pasture");
+          var acres = resolveAcres(props, feature, "pasture");
+          var url = MapUtils.getDetailURL(feature, "pasture");
+
+          if (acres != null) {
+            totalPastureAcres += acres;
+            updatePastureCardAcres(id, acres);
+          }
+
+          var html =
+            "<div class='text-sm'>" +
+              "<div class='font-semibold'>" + name + "</div>" +
+              (acres != null ? "<div class='text-xs text-gray-600'>" + acres.toFixed(2) + " ac</div>" : "") +
+              (url ? "<div class='mt-1 text-xs text-blue-600 underline'>Double-click to open detail</div>" : "") +
+            "</div>";
+
+          lyr.bindPopup(html);
+          lyr.on("click", function (e) { lyr.openPopup(e.latlng); });
+
+          // Click highlight upgrade
+          MapUtils.enableClickHighlight(lyr, baseStyle, { weight: 4 }, 1200);
+
+          if (url) {
+            lyr.on("dblclick", function (e) {
+              L.DomEvent.stop(e);
+              window.location.href = url;
+            });
+          }
+        }
+      });
+
+      pastureGroup.addLayer(layer);
+    }
+
+    function addPaddocks(geo) {
+      // DOTTED / DASHED here:
+      var baseStyle = {
+        color: "#0ea5e9",
+        weight: 2,
+        dashArray: "6,6",   // stronger pattern than "3"
+        lineCap: "round",
+        fillOpacity: 0.10
+      };
+
+      var layer = L.geoJSON(geo, {
+        pane: "paddocks",
+        renderer: svgRenderer, // critical for reliable dashes
+        style: function () { return baseStyle; },
+        onEachFeature: function (feature, lyr) {
+          anyFeature = true;
+
+          var props = feature.properties || {};
+          var id = props.id || feature.id;
+          var name = MapUtils.resolveName(props, "Paddock");
+          var acres = resolveAcres(props, feature, "paddock");
+          var url = MapUtils.getDetailURL(feature, "paddock");
+
+          if (acres != null) updatePaddockChipAcres(id, acres);
+
+          var html =
+            "<div class='text-sm'>" +
+              "<div class='font-semibold'>" + name + "</div>" +
+              (acres != null ? "<div class='text-xs text-gray-600'>" + acres.toFixed(2) + " ac</div>" : "") +
+              (url ? "<div class='mt-1 text-xs text-blue-600 underline'>Double-click to open detail</div>" : "") +
+            "</div>";
+
+          lyr.bindPopup(html);
+          lyr.on("click", function (e) { lyr.openPopup(e.latlng); });
+
+          // Click highlight upgrade
+          MapUtils.enableClickHighlight(lyr, baseStyle, { weight: 4 }, 1200);
+
+          if (url) {
+            lyr.on("dblclick", function (e) {
+              L.DomEvent.stop(e);
+              window.location.href = url;
+            });
+          }
+        }
+      });
+
+      paddockGroup.addLayer(layer);
+    }
+
+    function loadAndRender(url, kind, onOk) {
+      return fetch(url)
+        .then(function (res) {
+          if (!res.ok) throw new Error(kind + " fetch failed: " + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var geo = MapUtils.normalizeToFeatureCollection(data);
+          if (kind === "pastures") totalPastures = geo.features.length;
+          if (kind === "paddocks") totalPaddocks = geo.features.length;
+          onOk(geo);
+        })
+        .catch(function (err) {
+          console.warn("[PastureList] " + kind + " load error:", err);
+        });
+    }
+
+    Promise.all([
+      loadAndRender("/api/pastures/", "pastures", addPastures),
+      loadAndRender("/api/paddocks/", "paddocks", addPaddocks)
+    ]).then(function () {
+      // Fit bounds to everything loaded
+      if (anyFeature) {
+        MapUtils.fitToGroups(map, [pastureGroup, paddockGroup], [20, 20]);
+      }
+
+      // Update counts
+      if (totalPasturesEl) totalPasturesEl.textContent = totalPastures || "{{ pastures|length }}";
+      if (totalPaddocksEl) totalPaddocksEl.textContent = totalPaddocks || "—";
+
+      // Total acres: prefer summing pasture badges (matches your previous behavior)
+      var cardSum = 0;
+      document.querySelectorAll(".js-pasture-acres").forEach(function (span) {
+        var txt = span.textContent || "";
+        var m = txt.match(/([\d.]+)/);
+        if (m) {
+          var v = parseFloat(m[1]);
+          if (!isNaN(v)) cardSum += v;
+        }
+      });
+
+      if (totalPastureAcresEl && cardSum > 0) {
+        totalPastureAcresEl.textContent = cardSum.toFixed(2);
+      } else if (totalPastureAcresEl && totalPastureAcres > 0) {
+        totalPastureAcresEl.textContent = totalPastureAcres.toFixed(2);
+      }
+    });
+	map.on(L.Draw.Event.CREATED, function (e) {
+  const layer = e.layer;
+  const geom = layer.toGeoJSON().geometry;
+  const name = prompt("Paddock name?", "New Paddock") || "New Paddock";
+
+  fetch("/api/paddocks/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCSRF()
+    },
+    body: JSON.stringify({
+      pasture_id: Number(pk),
+      name: name,
+      geometry: geom
+    })
+  })
+  .then(r => {
+    if (!r.ok) throw new Error("Create failed: " + r.status);
+    return r.json();
+  })
+  .then(feature => {
+    // Add the created paddock feature to the map (styled dotted)
+    L.geoJSON(feature, {
+      style: { color:"#0ea5e9", weight:2, dashArray:"6,6", lineCap:"round", fillOpacity:0.10 }
+    }).addTo(map);
+  })
+  .catch(err => {
+    console.error("[PastureDetail] create paddock error:", err);
+  });
+});
+  });
+</script>
+{% endblock content %}

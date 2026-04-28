@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Health · {{ cattle.ear_tag }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Health · {{ cattle.ear_tag }}</h1>
+  <a href="{% url 'cattle_health_add' cattle.pk %}?next={% url 'cattle_health_list' cattle.pk %}" class="px-3 py-2 rounded-lg bg-blue-600 text-white shadow">
+    Add Record
+  </a>
+</div>
+<div class="bg-white shadow rounded-lg overflow-hidden">
+  <table class="min-w-full">
+    <thead class="bg-gray-50 text-left text-sm font-medium">
+      <tr>
+        <th class="px-4 py-3">Date</th>
+        <th class="px-4 py-3">Type</th>
+        <th class="px-4 py-3">Title</th>
+        <th class="px-4 py-3">Next Due</th>
+        <th class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for rec in records %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3">{{ rec.date|date:"Y-m-d" }}</td>
+        <td class="px-4 py-3">{{ rec.get_event_type_display }}</td>
+        <td class="px-4 py-3">{{ rec.title|default:"—" }}</td>
+        <td class="px-4 py-3">{{ rec.next_due|date:"Y-m-d"|default:"—" }}</td>
+        <td class="px-4 py-3 text-right space-x-2">
+          <a href="{% url 'health_edit' rec.pk %}" class="px-3 py-1 rounded bg-gray-200">Edit</a>
+          <a href="{% url 'health_delete' rec.pk %}" class="px-3 py-1 rounded bg-red-100 text-red-700">Delete</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td class="px-4 py-6 text-center text-gray-500" colspan="5">No health records yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/pagination.html" %}
+
+</div>
+{% endblock %}

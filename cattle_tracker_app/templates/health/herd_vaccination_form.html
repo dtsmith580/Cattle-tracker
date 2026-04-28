@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Herd Vaccination{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Herd Vaccination</h1>
+<form method="post" class="bg-white shadow rounded-lg p-6 space-y-4">
+  {% csrf_token %}
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="md:col-span-2">
+      {{ form.cattle.label_tag }} {{ form.cattle }}
+      <p class="text-xs text-gray-500 mt-1">Tip: hold Ctrl/Cmd to select multiple animals.</p>
+    </div>
+    <div>{{ form.date.label_tag }} {{ form.date }}</div>
+    <div>{{ form.vaccine_name.label_tag }} {{ form.vaccine_name }}</div>
+    <div>{{ form.dose.label_tag }} {{ form.dose }}</div>
+    <div>{{ form.administration_method.label_tag }} {{ form.administration_method }}</div>
+    <div>{{ form.batch_number.label_tag }} {{ form.batch_number }}</div>
+    <div>{{ form.withdrawal_date.label_tag }} {{ form.withdrawal_date }}</div>
+    <div>{{ form.next_due.label_tag }} {{ form.next_due }}</div>
+    <div>{{ form.performed_by.label_tag }} {{ form.performed_by }}</div>
+    <div>{{ form.cost.label_tag }} {{ form.cost }}</div>
+  </div>
+  <div class="flex justify-end space-x-2">
+    <a href="{% url 'health_list' %}" class="px-3 py-2 rounded bg-gray-200">Cancel</a>
+    <button class="px-3 py-2 rounded bg-emerald-600 text-white">Save</button>
+  </div>
+</form>
+{% endblock %}

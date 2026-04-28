@@ -100,7 +100,7 @@ class Pasture(models.Model):
                 g_3857 = g.clone()
                 g_3857.transform(3857)  # Web Mercator
                 area_m2 = g_3857.area
-                self.acres = round(area_m2 * ACRES_PER_M2, 2)
+                self.acres = round(area_m2 * self.ACRES_PER_M2, 2)
             except Exception:
                 # Leave acres as-is if transform fails
                 pass

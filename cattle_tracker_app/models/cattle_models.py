@@ -141,16 +141,8 @@ class Cattle(models.Model):
 
     @property
     def age(self):
-        return self.paddock.pasture if self.paddock else None
-
-    @property
-    def land_property(self):
-        return (self.paddock.pasture.land_property
-                if self.paddock and self.paddock.pasture else None)
-                
         today = date.today()
         delta = relativedelta(today, self.dob)
-
         parts = []
         if delta.years:
             parts.append(f"{delta.years} year{'s' if delta.years != 1 else ''}")
@@ -158,5 +150,9 @@ class Cattle(models.Model):
             parts.append(f"{delta.months} month{'s' if delta.months != 1 else ''}")
         if delta.days:
             parts.append(f"{delta.days} day{'s' if delta.days != 1 else ''}")
-
         return ", ".join(parts) if parts else "0 days"
+
+    @property
+    def land_property(self):
+        return (self.paddock.pasture.land_property
+                if self.paddock and self.paddock.pasture else None)
